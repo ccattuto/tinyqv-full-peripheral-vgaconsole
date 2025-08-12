@@ -13,7 +13,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 # Your project title
 
-Author: Your Name
+Author: Ciro Cattuto
 
 Peripheral index: nn
 
@@ -31,7 +31,7 @@ Document the registers that are used to interact with your peripheral
 
 ## How to test
 
-Explain how to use your project
+This is a test.
 
 ## External hardware
 
