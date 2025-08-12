@@ -31,6 +31,17 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
+    reg [7:0] buffer[0:95];
+    reg [6:0] index;
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            index <= 0;
+        end else begin
+            buffer[index] <= 0;
+            index <= (index < 95) ? (index + 1) : 0;
+        end
+    end
+
     // Implement a 32-bit read/write register at address 0
     reg [31:0] example_data;
     always @(posedge clk) begin
