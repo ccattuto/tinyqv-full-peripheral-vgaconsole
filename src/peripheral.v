@@ -63,6 +63,7 @@ module tqvp_example (
     // Address 4 reads ui_in
     // All other addresses read 0.
     assign data_out = (address == 6'h0) ? example_data :
+                      (address == 6'h1) ? {24'b0, buffer[index]} :
                       (address == 6'h4) ? {24'h0, ui_in} :
                       32'h0;
 
