@@ -37,7 +37,7 @@ module tqvp_example (
         if (!rst_n) begin
             index <= 0;
         end else begin
-            buffer[index] <= 0;
+            buffer[index] <= index;
             index <= (index < 95) ? (index + 1) : 0;
         end
     end
