@@ -42,8 +42,7 @@ module tqvp_example (
     localparam [5:0] DEFAULT_BG_COLOR = 6'b010000;
 
     // Text buffer (7-bit chars)
-    reg [6:0] text[0:NUM_CHARS-1];
-    reg [2:0] text_color[0:NUM_CHARS-1];
+    reg [9:0] text[0:NUM_CHARS-1];
     reg [5:0] bg_color;
 
     // ----- HOST INTERFACE -----
@@ -66,14 +65,12 @@ module tqvp_example (
     // Handle writes to character/color registers
     always @(posedge clk) begin
         if (we_text) begin
-            text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
-            text_color[address[CHARS_ADDR_WIDTH-1:0]] <= next_color;
+            text[address[CHARS_ADDR_WIDTH-1:0]] <= {next_color, data_in[6:0]};
         end
     end
 
     // Register reads
     assign data_out = 0;
-    //(address < NUM_CHARS) ? {21'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -132,11 +129,9 @@ module tqvp_example (
     assign char_x = (pix_x_frame / 6) >> 3; // divide by 48 (VGA char width is 48 pixels)
     assign char_y = pix_y_frame >> 6;       // divide by 64 (VGA char height is 64 pixels)
 
-    // Drive character ROM input
-    wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-
-    // Character color
-    wire [5:0] char_color = text_color[char_y * NUM_COLS + char_x];
+    wire [9:0] char  = text[char_y * NUM_COLS + char_x];
+    wire [6:0] char_index = char[6:0];  // Drive character ROM input
+    wire [2:0] char_color = char[9:7];  // Character color
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
