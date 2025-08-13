@@ -40,7 +40,7 @@ module tqvp_example (
 
     // Text buffer (7-bit chars)
     reg [6:0] text[0:NUM_CHARS-1];
-    reg [5:0] text_color[0:NUM_CHARS-1];
+    reg [2:0] text_color[0:NUM_CHARS-1];
     reg [5:0] bg_color;
 
     // ----- HOST INTERFACE -----
@@ -55,9 +55,9 @@ module tqvp_example (
                     text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
                 end
                 if (data_write_n == 2'b00) begin
-                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= 6'b011100;     // default text color
+                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= 3'b010;     // default text color
                 end else if (data_write_n != 2'b11) begin
-                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[13:8]; // set color
+                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[10:8]; // set color
                 end
             end else if (address == 6'h3F && data_write_n != 2'b11) begin
                 bg_color <= data_in[5:0];
@@ -66,7 +66,7 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {18'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
+    assign data_out = (address < NUM_CHARS) ? {21'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -152,9 +152,9 @@ module tqvp_example (
     // generate RGB signals
     wire pixel_on;
     assign pixel_on = frame_active & char_pixel;
-    assign R = ~video_active ? 2'b00 : (pixel_on ? char_color[1:0] : bg_color[1:0]);
-    assign G = ~video_active ? 2'b00 : (pixel_on ? char_color[3:2] : bg_color[3:2]);
-    assign B = ~video_active ? 2'b00 : (pixel_on ? char_color[5:4] : bg_color[5:4]);
+    assign R = ~video_active ? 2'b00 : ((pixel_on & char_color[0]) ? 2'b11 : bg_color[1:0]);
+    assign G = ~video_active ? 2'b00 : ((pixel_on & char_color[1]) ? 2'b11 : bg_color[3:2]);
+    assign B = ~video_active ? 2'b00 : ((pixel_on & char_color[2]) ? 2'b11 : bg_color[5:4]);
 
     // ----- CHARACTER ROM -----
 
