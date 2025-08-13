@@ -31,29 +31,52 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    reg [6:0] text[0:29];
+    localparam NUM_ROWS = 3;
+    localparam NUM_COLS = 10;
+    localparam NUM_CHARS = NUM_ROWS * NUM_COLS;
+    localparam ROWS_ADDR_WIDTH = $clog2(NUM_ROWS);
+    localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
+    localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
+
+    // Text buffer (7-bit chars)
+    reg [6:0] text[0:NUM_CHARS-1];
+
+
+    // ----- HOST INTERFACE -----
     
-    // Implement an 8-bit write register at address 0
+    // Writes to memory-mapped text buffer: only write lowest 8 bits
     always @(posedge clk) begin
         if (!rst_n) begin
             ;
         end else begin
-            if ((address < 30) && (data_write_n == 2'b00)) begin
-                text[address[4:0]] <= data_in[6:0];
+            if ((address < NUM_CHARS) && (data_write_n != 2'b11)) begin
+                text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
             end
         end
     end
 
-    assign data_out = 32'h0;
+    // Register reads
+    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 32'h0;
 
+    // All reads complete in 1 clock
     assign data_ready = 1;
 
+    // No interrupt handling
     assign user_interrupt = 0;
 
     wire _unused = &{data_read_n, 1'b0};
 
 
-        // VGA signals
+    // ----- VGA INTERFACE -----
+
+    localparam VGA_WIDTH = 640;
+    localparam VGA_HEIGHT = 480;
+    localparam VGA_FRAME_XMIN = 80;
+    localparam VGA_FRAME_XMAX = 640-80;
+    localparam VGA_FRAME_YMIN = 128;
+    localparam VGA_FRAME_YMAX = 480-160;
+
+    // VGA signals
     wire hsync;
     wire vsync;
     wire [1:0] R;
@@ -77,35 +100,48 @@ module tqvp_example (
     );
 
     wire frame_active;
-    assign frame_active = (pix_x >= 80 && pix_x < 640-80 && pix_y >= 128 && pix_y < 480-160) ? 1 : 0;
+    assign frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
 
+    // (x,y) coordinates relative to frame
     wire [9:0] pix_x_frame, pix_y_frame;
-    assign pix_x_frame = pix_x - 80;
-    assign pix_y_frame = pix_y - 128;
+    assign pix_x_frame = pix_x - VGA_FRAME_XMIN;
+    assign pix_y_frame = pix_y - VGA_FRAME_YMIN;
 
-    wire [5:0] rem_x;
-    wire [5:0] rem_y;
-    assign rem_x = pix_x_frame[9:3] % 6;
-    assign rem_y = pix_y_frame[9:3] & 7;
+    // Character pixels are 8x8 squares in the VGA frame.
+    // Character glyphs are 5x7 and padded in a 6x8 character box.
 
-    wire [5:0] offset;
-    assign offset = (rem_y << 2) + rem_y + rem_x;
+    // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
+    wire [COLS_ADDR_WIDTH-1:0] char_x;
+    wire [ROWS_ADDR_WIDTH-1:0] char_y;
+    assign char_x = (pix_x_frame / 6) >> 3; // divide by 48 (VGA char width is 48 pixels)
+    assign char_y = pix_y_frame >> 6;       // divide by 64 (VGA char height is 64 pixels)
 
-    wire [4:0] char_x;
-    wire [1:0] char_y;
-    assign char_x = (pix_x_frame / 6) >> 3;
-    assign char_y = pix_y_frame >> 6;
-
+    // Drive character ROM input
     wire [6:0] char_index;
-    assign char_index = text[char_y * 10 + char_x];
+    assign char_index = text[char_y * NUM_COLS + char_x];
 
+    // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
+    wire [2:0] rel_x;
+    wire [2:0] rel_y;
+    assign rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
+    assign rel_y = pix_y_frame[9:3] & 7;    // remainder of division by 8
+
+    // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
+    wire [5:0] offset;
+    assign offset = (rel_y << 2) + rel_y + rel_x;
+
+    // Look up character pixel value in character ROM,
+    // handling 1-pixel padding along x and y directions.
     wire char_pixel;
-    assign char_pixel = ((rem_y == 7) || (rem_x == 5)) ? 0 : char_data[offset];
+    assign char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
 
     // generate RGB signals
     assign R = 2'b00;
     assign G = (video_active & frame_active & char_pixel) ? 2'b11 : 2'b00;
-    assign B = 2'b01;
+    assign B = video_active ? 2'b01 : 2'b00;
+
+
+    // ----- CHARACTER ROM -----
 
     wire [34:0] char_data;
 
