@@ -72,9 +72,9 @@ module tqvp_example (
     localparam VGA_WIDTH = 640;
     localparam VGA_HEIGHT = 480;
     localparam VGA_FRAME_XMIN = 80;
-    localparam VGA_FRAME_XMAX = 640-80;
+    localparam VGA_FRAME_XMAX = VGA_WIDTH - 80;
     localparam VGA_FRAME_YMIN = 128;
-    localparam VGA_FRAME_YMAX = 480-160;
+    localparam VGA_FRAME_YMAX = VGA_HEIGHT - 160;
 
     // VGA signals
     wire hsync;

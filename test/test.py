@@ -5,7 +5,8 @@ import cocotb
 from cocotb.clock import Clock, Timer
 from cocotb.triggers import Edge, ClockCycles
 import numpy as np
-import imageio
+import imageio.v2 as imageio
+import random
 
 from tqv import TinyQV
 
@@ -45,17 +46,44 @@ async def test_project(dut):
     dut._log.info("Test project behavior")
 
     # Test register write and read back
-    for i in range(36):
-        await tqv.write_byte_reg(i, 0)
+    dut._log.info("Write/read registers")
+    random.seed(42)
+
+    # byte writes/reads
+    for i in range(30):
+        val = random.randint(0,127)
+        await tqv.write_byte_reg(i, val)
+        await tqv.read_byte_reg(i) == val
+
+    # word writes/reads
+    for i in range(30):
+        val = random.randint(0,127)
+        await tqv.write_word_reg(i, val)
+        await tqv.read_word_reg(i) == val
+
+    # clear console (all spaces)
+    for i in range(30):
+        await tqv.write_word_reg(i, 32)
     
-    await tqv.write_byte_reg(0, ord('C'))
-    await tqv.write_byte_reg(1, ord('I'))
-    await tqv.write_byte_reg(2, ord('R'))
-    await tqv.write_byte_reg(3, ord('O'))
-    await tqv.write_byte_reg(4, ord('!'))
+    # pay homage to TinyTapeout
+    for (i, ch) in enumerate("VGA"):
+        await tqv.write_byte_reg(0+i, ord(ch))
+    for (i, ch) in enumerate("CONSOLE"):
+        await tqv.write_byte_reg(10+i, ord(ch))
+    for (i, ch) in enumerate("PERIPHERAL"):
+        await tqv.write_byte_reg(20+i, ord(ch))
+
+    # await tqv.write_byte_reg(0, ord('C'))
+    # await tqv.write_byte_reg(1, ord('I'))
+    # await tqv.write_byte_reg(2, ord('R'))
+    # await tqv.write_byte_reg(3, ord('O'))
+    # await tqv.write_byte_reg(4, ord('!'))
 
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    imageio.imwrite("vga_grab.png", vgaframe * 64)
+    #imageio.imwrite("vga_grab.png", vgaframe * 64)
+
+    vgaframe_ref = imageio.imread("vga_ref.png") / 64
+    assert np.all(vgaframe == vgaframe_ref)
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
