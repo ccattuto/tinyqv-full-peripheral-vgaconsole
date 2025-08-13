@@ -31,15 +31,15 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    reg [6:0] text[0:35];
+    reg [6:0] text[0:29];
     
     // Implement an 8-bit write register at address 0
     always @(posedge clk) begin
         if (!rst_n) begin
             ;
         end else begin
-            if ((address < 36) && (data_write_n == 2'b00)) begin
-                text[address[5:0]] <= data_in[6:0];
+            if ((address < 30) && (data_write_n == 2'b00)) begin
+                text[address[4:0]] <= data_in[6:0];
             end
         end
     end
@@ -67,35 +67,37 @@ module tqvp_example (
     assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
     hvsync_generator hvsync_gen(
-    .clk(clk),
-    .reset(~rst_n),
-    .hsync(hsync),
-    .vsync(vsync),
-    .display_on(video_active),
-    .hpos(pix_x),
-    .vpos(pix_y)
+        .clk(clk),
+        .reset(~rst_n),
+        .hsync(hsync),
+        .vsync(vsync),
+        .display_on(video_active),
+        .hpos(pix_x),
+        .vpos(pix_y)
     );
 
-    // high when the pixel belongs to the simulation rectangle
     wire frame_active;
-    assign frame_active = (pix_x >= 48 && pix_x < 640-24 && pix_y >= 64 && pix_y < 480-168-64) ? 1 : 0;
+    assign frame_active = (pix_x >= 80 && pix_x < 640-80 && pix_y >= 128 && pix_y < 480-160) ? 1 : 0;
+
+    wire [9:0] pix_x_frame, pix_y_frame;
+    assign pix_x_frame = pix_x - 80;
+    assign pix_y_frame = pix_y - 128;
 
     wire [5:0] rem_x;
     wire [5:0] rem_y;
-
-    assign rem_x = pix_x[9:3] % 6;
-    assign rem_y = pix_y[9:3] & 7;
+    assign rem_x = pix_x_frame[9:3] % 6;
+    assign rem_y = pix_y_frame[9:3] & 7;
 
     wire [5:0] offset;
-    assign offset = 6'd34 - ((rem_y << 2) + rem_y + rem_x);
+    assign offset = (rem_y << 2) + rem_y + rem_x;
 
     wire [4:0] char_x;
     wire [1:0] char_y;
-    assign char_x = ((pix_x - 48) / 6) >> 3;
-    assign char_y = (pix_y - 64) >> 6;
+    assign char_x = (pix_x_frame / 6) >> 3;
+    assign char_y = pix_y_frame >> 6;
 
     wire [6:0] char_index;
-    assign char_index = text[char_y * 12 + char_x];
+    assign char_index = text[char_y * 10 + char_x];
 
     wire char_pixel;
     assign char_pixel = ((rem_y == 7) || (rem_x == 5)) ? 0 : char_data[offset];
@@ -103,7 +105,7 @@ module tqvp_example (
     // generate RGB signals
     assign R = 2'b00;
     assign G = (video_active & frame_active & char_pixel) ? 2'b11 : 2'b00;
-    assign B = 2'b00;
+    assign B = 2'b01;
 
     wire [34:0] char_data;
 
