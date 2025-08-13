@@ -49,19 +49,21 @@ module tqvp_example (
     // ----- HOST INTERFACE -----
     
     wire in_text_range = (address < NUM_CHARS);
-    wire any_write = (data_write_n != 2'b11);
+    wire any_write = ~(data_write_n[1] & data_write_n[0]);
     wire we_text = in_text_range & any_write;
     wire we_bg = (address == 6'h3F) & any_write;
 
+    // byte writes use the default text color, wider writes also provide color bits
     wire [2:0] next_color = (data_write_n == 2'b00) ? DEFAULT_TEXT_COLOR : data_in[10:8];
 
     always @(posedge clk) begin
         if (!rst_n)
-            bg_color <= 6'b010000;
+            bg_color <= DEFAULT_BG_COLOR;
         else if (we_bg)
             bg_color <= data_in[5:0];
     end
 
+    // Handle writes to character/color registers
     always @(posedge clk) begin
         if (we_text) begin
             text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
@@ -114,8 +116,7 @@ module tqvp_example (
         .vpos(pix_y)
     );
 
-    wire frame_active;
-    assign frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
+    wire frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
 
     // (x,y) coordinates relative to frame
     wire [9:0] pix_x_frame, pix_y_frame;
@@ -132,34 +133,27 @@ module tqvp_example (
     assign char_y = pix_y_frame >> 6;       // divide by 64 (VGA char height is 64 pixels)
 
     // Drive character ROM input
-    wire [6:0] char_index;
-    assign char_index = text[char_y * NUM_COLS + char_x];
+    wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
 
     // Character color
-    wire [5:0] char_color;
-    assign char_color = text_color[char_y * NUM_COLS + char_x];
+    wire [5:0] char_color = text_color[char_y * NUM_COLS + char_x];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
-    wire [2:0] rel_x;
-    wire [2:0] rel_y;
-    assign rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
-    assign rel_y = pix_y_frame[9:3] & 7;    // remainder of division by 8
+    wire [2:0] rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
+    wire [2:0] rel_y = pix_y_frame[9:3] & 7;    // remainder of division by 8
 
     // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
-    wire [5:0] offset;
-    assign offset = (rel_y << 2) + rel_y + rel_x;
+    wire [5:0] offset = (rel_y << 2) + rel_y + rel_x;
 
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
-    wire char_pixel;
-    assign char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
+    wire char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
 
     // generate RGB signals
-    wire pixel_on;
-    assign pixel_on = frame_active & char_pixel;
-    assign R = ~video_active ? 2'b00 : (pixel_on ? {char_color[0], char_color[0]} : bg_color[1:0]);
-    assign G = ~video_active ? 2'b00 : (pixel_on ? {char_color[1], char_color[1]} : bg_color[3:2]);
-    assign B = ~video_active ? 2'b00 : (pixel_on ? {char_color[2], char_color[2]} : bg_color[5:4]);
+    wire pixel_on = frame_active & char_pixel;
+    wire [5:0] char_rgb = { {2{char_color[2]}}, {2{char_color[1]}}, {2{char_color[0]}} };
+    assign {B, G, R} = ~video_active ? 6'b0 : (pixel_on ? char_rgb : bg_color);
+
 
     // ----- CHARACTER ROM -----
 
