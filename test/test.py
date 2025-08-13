@@ -5,7 +5,7 @@ import cocotb
 from cocotb.clock import Clock, Timer
 from cocotb.triggers import Edge, ClockCycles
 import numpy as np
-from PIL import Image
+import imageio
 
 from tqv import TinyQV
 
@@ -55,8 +55,7 @@ async def test_project(dut):
     await tqv.write_byte_reg(4, ord('!'))
 
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    img = Image.fromarray(vgaframe * 64)
-    img.save("vga_grab.png")
+    imageio.imwrite("vga_grab.png", vgaframe * 64)
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
