@@ -31,68 +31,92 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    reg [7:0] buffer[0:47];
-    reg [6:0] index;
+    reg [6:0] text[0:47];
+    reg [5:0] index;
+    
+    // Implement an 8-bit write register at address 0
     always @(posedge clk) begin
         if (!rst_n) begin
             index <= 0;
         end else begin
-            buffer[index] <= buffer[index] + index;
-            index <= (index < 47) ? (index + 1) : 0;
-        end
-    end
-
-    // Implement a 32-bit read/write register at address 0
-    reg [31:0] example_data;
-    always @(posedge clk) begin
-        if (!rst_n) begin
-            example_data <= 0;
-        end else begin
             if (address == 6'h0) begin
-                if (data_write_n != 2'b11)              example_data[7:0]   <= data_in[7:0];
-                if (data_write_n[1] != data_write_n[0]) example_data[15:8]  <= data_in[15:8];
-                if (data_write_n == 2'b10)              example_data[31:16] <= data_in[31:16];
+                if (data_write_n == 2'b00) begin
+                    index <= data_in[5:0];
+                end
+            end else if (address == 6'h1) begin
+                if (data_write_n == 2'b00) begin
+                    text[index] <= data_in[6:0];
+                end
             end
         end
     end
 
-    // The bottom 8 bits of the stored data are added to ui_in and output to uo_out.
-    assign uo_out = example_data[7:0] + ui_in;
+    assign data_out = 32'h0;
 
-    // Address 0 reads the example data register.  
-    // Address 4 reads ui_in
-    // All other addresses read 0.
-    assign data_out = (address == 6'h0) ? example_data :
-                      (address == 6'h1) ? {24'b0, buffer[index]} :
-                      (address == 6'h4) ? {24'h0, ui_in} :
-                      32'h0;
-
-    // All reads complete in 1 clock
     assign data_ready = 1;
-    
-    // User interrupt is generated on rising edge of ui_in[6], and cleared by writing a 1 to the low bit of address 8.
-    reg example_interrupt;
-    reg last_ui_in_6;
 
-    always @(posedge clk) begin
-        if (!rst_n) begin
-            example_interrupt <= 0;
-        end
+    assign user_interrupt = 0;
 
-        if (ui_in[6] && !last_ui_in_6) begin
-            example_interrupt <= 1;
-        end else if (address == 6'h8 && data_write_n != 2'b11 && data_in[0]) begin
-            example_interrupt <= 0;
-        end
-
-        last_ui_in_6 <= ui_in[6];
-    end
-
-    assign user_interrupt = example_interrupt;
-
-    // List all unused inputs to prevent warnings
-    // data_read_n is unused as none of our behaviour depends on whether
-    // registers are being read.
     wire _unused = &{data_read_n, 1'b0};
+
+
+        // VGA signals
+    wire hsync;
+    wire vsync;
+    wire [1:0] R;
+    wire [1:0] G;
+    wire [1:0] B;
+    wire video_active;
+    wire [9:0] pix_x;
+    wire [9:0] pix_y;
+
+    // TinyVGA PMOD
+    assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
+
+    hvsync_generator hvsync_gen(
+    .clk(clk),
+    .reset(~rst_n),
+    .hsync(hsync),
+    .vsync(vsync),
+    .display_on(video_active),
+    .hpos(pix_x),
+    .vpos(pix_y)
+    );
+
+    // high when the pixel belongs to the simulation rectangle
+    wire frame_active;
+    assign frame_active = (pix_x >= 48 && pix_x < 640-24 && pix_y >= 64 && pix_y < 480-168) ? 1 : 0;
+
+    wire [5:0] rem_x;
+    wire [5:0] rem_y;
+
+    assign rem_x = pix_x[9:3] % 6;
+    assign rem_y = pix_y[9:3] & 7;
+
+    wire [5:0] offset;
+    assign offset = 6'd34 - ((rem_y << 2) + rem_y + rem_x);
+
+    wire [4:0] char_x;
+    wire [1:0] char_y;
+    assign char_x = ((pix_x - 48) / 6) >> 3;
+    assign char_y = (pix_y - 64) >> 6;
+
+    wire [6:0] char_index;
+    assign char_index = text[char_y * 12 + char_x];
+
+    wire char_pixel;
+    assign char_pixel = ((rem_y == 7) || (rem_x == 5)) ? 0 : char_data[offset];
+
+    // generate RGB signals
+    assign R = 2'b00;
+    assign G = (video_active & frame_active & char_pixel) ? 2'b11 : 2'b00;
+    assign B = 2'b00;
+
+    wire [34:0] char_data;
+
+    char_rom char_rom_inst (
+        .address(char_index),
+        .data(char_data) 
+    );
 
 endmodule
