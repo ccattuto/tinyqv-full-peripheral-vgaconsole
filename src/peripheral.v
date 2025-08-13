@@ -66,7 +66,8 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {21'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
+    assign data_out = 0;
+    //(address < NUM_CHARS) ? {21'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
