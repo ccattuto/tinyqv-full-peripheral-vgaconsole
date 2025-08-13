@@ -32,21 +32,14 @@ module tqvp_example (
 );
 
     reg [6:0] text[0:35];
-    reg [5:0] index;
     
     // Implement an 8-bit write register at address 0
     always @(posedge clk) begin
         if (!rst_n) begin
-            index <= 0;
+            ;
         end else begin
-            if (address == 6'h0) begin
-                if (data_write_n == 2'b00) begin
-                    index <= data_in[5:0];
-                end
-            end else if (address == 6'h1) begin
-                if (data_write_n == 2'b00) begin
-                    text[index] <= data_in[6:0];
-                end
+            if ((address < 36) && (data_write_n == 2'b00)) begin
+                text[address[5:0]] <= data_in[6:0];
             end
         end
     end
