@@ -31,7 +31,7 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    reg [6:0] text[0:47];
+    reg [6:0] text[0:35];
     reg [5:0] index;
     
     // Implement an 8-bit write register at address 0
@@ -85,7 +85,7 @@ module tqvp_example (
 
     // high when the pixel belongs to the simulation rectangle
     wire frame_active;
-    assign frame_active = (pix_x >= 48 && pix_x < 640-24 && pix_y >= 64 && pix_y < 480-168) ? 1 : 0;
+    assign frame_active = (pix_x >= 48 && pix_x < 640-24 && pix_y >= 64 && pix_y < 480-168-64) ? 1 : 0;
 
     wire [5:0] rem_x;
     wire [5:0] rem_y;
