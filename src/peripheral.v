@@ -40,23 +40,33 @@ module tqvp_example (
 
     // Text buffer (7-bit chars)
     reg [6:0] text[0:NUM_CHARS-1];
-
+    reg [5:0] text_color[0:NUM_CHARS-1];
+    reg [5:0] bg_color;
 
     // ----- HOST INTERFACE -----
     
     // Writes to memory-mapped text buffer: only write lowest 8 bits
     always @(posedge clk) begin
         if (!rst_n) begin
-            ;
+            bg_color <= 6'b010000;
         end else begin
-            if ((address < NUM_CHARS) && (data_write_n != 2'b11)) begin
-                text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
+            if (address < NUM_CHARS) begin
+                if (data_write_n != 2'b11) begin
+                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
+                end
+                if (data_write_n == 2'b00) begin
+                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= 6'b011100;     // default text color
+                end else if (data_write_n != 2'b11) begin
+                    text_color[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[13:8]; // set color
+                end
+            end else if (address == 6'h3F && data_write_n != 2'b11) begin
+                bg_color <= data_in[5:0];
             end
         end
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 32'h0;
+    assign data_out = (address < NUM_CHARS) ? {18'h0, text_color[address[CHARS_ADDR_WIDTH-1:0]], 1'b0, text[address[CHARS_ADDR_WIDTH-1:0]]} : (address == 6'h3F) ? {26'h0, bg_color} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -120,6 +130,10 @@ module tqvp_example (
     wire [6:0] char_index;
     assign char_index = text[char_y * NUM_COLS + char_x];
 
+    // Character color
+    wire [5:0] char_color;
+    assign char_color = text_color[char_y * NUM_COLS + char_x];
+
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_x;
     wire [2:0] rel_y;
@@ -136,10 +150,11 @@ module tqvp_example (
     assign char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
 
     // generate RGB signals
-    assign R = 2'b00;
-    assign G = (video_active & frame_active & char_pixel) ? 2'b11 : 2'b00;
-    assign B = video_active ? 2'b01 : 2'b00;
-
+    wire pixel_on;
+    assign pixel_on = frame_active & char_pixel;
+    assign R = ~video_active ? 2'b00 : (pixel_on ? char_color[1:0] : bg_color[1:0]);
+    assign G = ~video_active ? 2'b00 : (pixel_on ? char_color[3:2] : bg_color[3:2]);
+    assign B = ~video_active ? 2'b00 : (pixel_on ? char_color[5:4] : bg_color[5:4]);
 
     // ----- CHARACTER ROM -----
 
