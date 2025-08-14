@@ -55,10 +55,10 @@ async def test_project(dut):
 
     # Write in yellow
     for (i, ch) in enumerate("CONSOLE"):
-        await tqv.write_word_reg(10+i, (0b011 << 8) | ord(ch))
+        await tqv.write_word_reg(10+i, (0b11 << 8) | ord(ch))
 
     # Write using a different color for each character
-    for (i, ch, col) in zip(range(10), "PERIPHERAL", [0x5, 0x3, 0x2, 0x6, 0x7, 0x5, 0x3, 0x6, 0x1, 0x7]):
+    for (i, ch, col) in zip(range(10), "PERIPHERAL", [0x1, 0x2, 0x3, 0x0, 0x1, 0x2, 0x3, 0x0, 0x1, 0x2]):
         await tqv.write_word_reg(20+i, (col << 8) | ord(ch))
 
     # await tqv.write_byte_reg(0, ord('C'))
