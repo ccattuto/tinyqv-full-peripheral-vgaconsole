@@ -83,12 +83,12 @@ module tqvp_example (
 
     // ----- VGA INTERFACE -----
 
-    localparam VGA_WIDTH = 640;
-    localparam VGA_HEIGHT = 480;
-    localparam VGA_FRAME_XMIN = 80;
-    localparam VGA_FRAME_XMAX = VGA_WIDTH - 80;
-    localparam VGA_FRAME_YMIN = 128;
-    localparam VGA_FRAME_YMAX = VGA_HEIGHT - 160;
+    localparam [9:0] VGA_WIDTH = 640;
+    localparam [9:0] VGA_HEIGHT = 480;
+    localparam [9:0] VGA_FRAME_XMIN = 80;
+    localparam [9:0] VGA_FRAME_XMAX = VGA_WIDTH - 80;
+    localparam [9:0] VGA_FRAME_YMIN = 128;
+    localparam [9:0] VGA_FRAME_YMAX = VGA_HEIGHT - 160;
 
     // VGA signals
     wire hsync;
@@ -113,12 +113,18 @@ module tqvp_example (
         .vpos(pix_y)
     );
 
-    wire frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX);
 
-    // (x,y) coordinates relative to frame
-    wire [9:0] pix_x_frame, pix_y_frame;
-    assign pix_x_frame = pix_x - VGA_FRAME_XMIN;
-    assign pix_y_frame = pix_y - VGA_FRAME_YMIN;
+    // compute (x,y) coordinates relative to frame, and frame_active flag
+
+    wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
+    wire pix_x_below_xmin = pix_x_diff[10];        // pix_x < XMIN
+    wire [9:0] pix_x_frame = pix_x_diff[9:0];   // pix_x - XMIN
+
+    wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
+    wire pix_y_below_ymin = pix_y_diff[10];        // pix_y < YMIN
+    wire [9:0] pix_y_frame = pix_y_diff[9:0];   // pix_y - YMIN
+
+    wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
 
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
@@ -130,16 +136,21 @@ module tqvp_example (
     wire rel_x_5 = (rel_x == 3'd5);
     reg [2:0] cnt1;
     reg [COLS_ADDR_WIDTH-1:0] char_x;
+    
     always @(posedge clk) begin
         if (pix_x == VGA_FRAME_XMIN-1) begin
-            cnt1   <= 0;
-            rel_x  <= 0;
-            char_x <= '0;
+            rel_x <= 0;
+            cnt1 <= 0;
+            char_x <= 0;
         end else begin
             cnt1 <= cnt1 + 1;
             if (&cnt1) begin
-                rel_x  <= rel_x_5 ? 0 : rel_x + 1;
-                char_x <= char_x + rel_x_5;
+                if (rel_x_5) begin
+                    rel_x <= 0;
+                    char_x <= char_x + 1;
+                end else begin
+                    rel_x <= rel_x + 1;
+                end
             end
         end
     end
