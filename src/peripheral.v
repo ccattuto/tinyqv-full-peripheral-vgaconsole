@@ -115,6 +115,34 @@ module tqvp_example (
 
     wire frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
 
+    reg [2:0] rel_x;
+    reg [2:0] cnt1;
+    reg [COLS_ADDR_WIDTH-1:0] char_x;
+
+    always @(posedge clk) begin
+        if (~rst_n) begin
+            rel_x <= 0;
+            cnt1 <= 0;
+            char_x <= 0;
+        end else begin
+            if (pix_x == VGA_FRAME_XMIN-1) begin
+                rel_x <= 0;
+                cnt1 <= 0;
+                char_x <= 0;
+            end else begin
+                cnt1 <= cnt1 + 1;
+                if (&cnt1) begin
+                    if (rel_x == 5) begin
+                        rel_x <= 0;
+                        char_x <= char_x + 1;
+                    end else begin
+                        rel_x <= rel_x + 1;
+                    end
+                end
+            end
+        end
+    end
+
     // (x,y) coordinates relative to frame
     wire [9:0] pix_x_frame, pix_y_frame;
     assign pix_x_frame = pix_x - VGA_FRAME_XMIN;
@@ -122,27 +150,23 @@ module tqvp_example (
 
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
-
+ 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [COLS_ADDR_WIDTH-1:0] char_x;
-    wire [ROWS_ADDR_WIDTH-1:0] char_y;
-    assign char_x = (pix_x_frame / 6) >> 3; // divide by 48 (VGA char width is 48 pixels)
-    assign char_y = pix_y_frame >> 6;       // divide by 64 (VGA char height is 64 pixels)
+    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[6+ROWS_ADDR_WIDTH-1:6];  // divide by 64 (VGA char height is 64 pixels)
 
-    wire [9:0] char  = text[char_y * NUM_COLS + char_x];
+    wire [9:0] char  = text[({{(10-COLS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(10-COLS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x];
     wire [6:0] char_index = char[6:0];  // Drive character ROM input
     wire [2:0] char_color = char[9:7];  // Character color
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
-    wire [2:0] rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
-    wire [2:0] rel_y = pix_y_frame[9:3] & 7;    // remainder of division by 8
+    wire [2:0] rel_y = pix_y_frame[5:3];    // remainder of division by 8
 
     // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
     wire [5:0] offset = (rel_y << 2) + rel_y + rel_x;
 
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
-    wire char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
+    wire char_pixel = (&rel_y || (rel_x == 5)) ? 0 : char_data[offset];
 
     // generate RGB signals
     wire pixel_on = frame_active & char_pixel;
