@@ -39,7 +39,7 @@ module tqvp_example (
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
     localparam [2:0] DEFAULT_TEXT_COLOR = 3'b010;
-    localparam [5:0] DEFAULT_BG_COLOR = 6'b010000;
+    localparam [5:0] DEFAULT_BG_COLOR = 6'b000000;
 
     // Text buffer (7-bit chars)
     reg [9:0] text[0:NUM_CHARS-1];
@@ -50,7 +50,7 @@ module tqvp_example (
     wire in_text_range = (address < NUM_CHARS);
     wire any_write = ~(data_write_n[1] & data_write_n[0]);
     wire we_text = in_text_range & any_write;
-    wire we_bg = (address == 6'h3F) & any_write;
+    wire we_bg = &address & any_write;
 
     // byte writes use the default text color, wider writes also provide color bits
     wire [2:0] next_color = (data_write_n == 2'b00) ? DEFAULT_TEXT_COLOR : data_in[10:8];
@@ -117,11 +117,11 @@ module tqvp_example (
     // compute (x,y) coordinates relative to frame, and frame_active flag
 
     wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
-    wire pix_x_below_xmin = pix_x_diff[10];        // pix_x < XMIN
+    wire pix_x_below_xmin = pix_x_diff[10];     // pix_x < XMIN
     wire [9:0] pix_x_frame = pix_x_diff[9:0];   // pix_x - XMIN
 
     wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
-    wire pix_y_below_ymin = pix_y_diff[10];        // pix_y < YMIN
+    wire pix_y_below_ymin = pix_y_diff[10];     // pix_y < YMIN
     wire [9:0] pix_y_frame = pix_y_diff[9:0];   // pix_y - YMIN
 
     wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
