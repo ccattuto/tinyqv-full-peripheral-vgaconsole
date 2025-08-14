@@ -180,7 +180,7 @@ module tqvp_example (
     wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[6+ROWS_ADDR_WIDTH-1:6];  // divide by 64 (VGA char height is 64 pixels)
 
     // Here we hardcode NUM_COLS = 10 to save gates, the general case is: text[char_y * NUL_COLS + char_x]
-    wire [9:0] char  = text[({{(10-COLS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(10-COLS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x];
+    wire [9:0] char = text[({{(10-COLS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(10-COLS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x];
     wire [6:0] char_index = char[6:0];  // Drive character ROM input
     wire [2:0] char_color = char[9:7];  // Character color
 

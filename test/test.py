@@ -45,33 +45,21 @@ async def test_project(dut):
 
     dut._log.info("Test project behavior")
 
-    # Test register write and read back
-    dut._log.info("Write/read registers")
-    random.seed(42)
-
-    # byte writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_byte_reg(i, val)
-        await tqv.read_byte_reg(i) == val
-
-    # word writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_word_reg(i, val)
-        await tqv.read_word_reg(i) == val
-
     # clear console (all spaces)
     for i in range(30):
         await tqv.write_word_reg(i, 32)
     
-    # pay homage to TinyTapeout
+    # Write with default color
     for (i, ch) in enumerate("VGA"):
         await tqv.write_byte_reg(0+i, ord(ch))
+
+    # Write in yellow
     for (i, ch) in enumerate("CONSOLE"):
-        await tqv.write_byte_reg(10+i, ord(ch))
-    for (i, ch) in enumerate("PERIPHERAL"):
-        await tqv.write_byte_reg(20+i, ord(ch))
+        await tqv.write_word_reg(10+i, (0b011 << 8) | ord(ch))
+
+    # Write using a different color for each character
+    for (i, ch, col) in zip(range(10), "PERIPHERAL", [0x5, 0x3, 0x2, 0x6, 0x7, 0x5, 0x3, 0x6, 0x1, 0x7]):
+        await tqv.write_word_reg(20+i, (col << 8) | ord(ch))
 
     # await tqv.write_byte_reg(0, ord('C'))
     # await tqv.write_byte_reg(1, ord('I'))
@@ -79,9 +67,14 @@ async def test_project(dut):
     # await tqv.write_byte_reg(3, ord('O'))
     # await tqv.write_byte_reg(4, ord('!'))
 
-    vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab.png", vgaframe * 64)
+    # set background color
+    await tqv.write_word_reg(0x3F, 0b010000)
 
+    # grab next VGA frame
+    vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
+    imageio.imwrite("vga_grab.png", vgaframe * 64)
+
+    # compared with reference image
     vgaframe_ref = imageio.imread("vga_ref.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
