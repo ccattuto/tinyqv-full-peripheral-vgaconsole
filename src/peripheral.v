@@ -38,11 +38,11 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam [2:0] DEFAULT_TEXT_COLOR = 3'b010;
+    localparam [1:0] DEFAULT_TEXT_COLOR = 2'b10;
     localparam [5:0] DEFAULT_BG_COLOR = 6'b000000;
 
-    // Text buffer (7-bit chars)
-    reg [9:0] text[0:NUM_CHARS-1];
+    // Text buffer (printable ASCII code in the lowest 7 bits, color in the top 2 bits)
+    reg [8:0] text[0:NUM_CHARS-1];
     reg [5:0] bg_color;
 
     // ----- HOST INTERFACE -----
@@ -53,7 +53,7 @@ module tqvp_example (
     wire we_bg = &address & any_write;
 
     // byte writes use the default text color, wider writes also provide color bits
-    wire [2:0] next_color = (data_write_n == 2'b00) ? DEFAULT_TEXT_COLOR : data_in[10:8];
+    wire [1:0] next_color = (data_write_n == 2'b00) ? DEFAULT_TEXT_COLOR : data_in[9:8];
 
     always @(posedge clk) begin
         if (!rst_n)
@@ -180,15 +180,16 @@ module tqvp_example (
     wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[6+ROWS_ADDR_WIDTH-1:6];  // divide by 64 (VGA char height is 64 pixels)
 
     // Here we hardcode NUM_COLS = 10 to save gates, the general case is: text[char_y * NUL_COLS + char_x]
-    wire [9:0] char = text[({{(10-COLS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(10-COLS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x];
+    wire [4:0] char_addr = ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(5-ROWS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x;
+    wire [8:0] char = text[char_addr];
     wire [6:0] char_index = char[6:0];  // Drive character ROM input
-    wire [2:0] char_color = char[9:7];  // Character color
+    wire [1:0] char_color = char[8:7];  // Character color
 
     // Current pixel's y coordinate within current character (5x7 glyph padded in a 6x8 character box)
     wire [2:0] rel_y = pix_y_frame[5:3];  // remainder of division by 8
 
     // Current pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
-    wire [5:0] offset = (rel_y << 2) + rel_y + rel_x;
+    wire [5:0] offset = ({3'b0, rel_y} << 2) + {3'b0, rel_y} + {3'b0, rel_x};
 
     // Current pixel's state in character ROM,
     // handling 1-pixel padding along x and y directions.
@@ -196,8 +197,8 @@ module tqvp_example (
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
-    wire [5:0] char_rgb = { {2{char_color[2]}}, {2{char_color[1]}}, {2{char_color[0]}} };
-    assign {B, G, R} = ~video_active ? 6'b0 : (pixel_on ? char_rgb : bg_color);
+    wire [5:0] char_bgr = { 2'b11, {2{char_color[1]}}, {2{char_color[0]}} };
+    assign {B, G, R} = ~video_active ? 6'b0 : (pixel_on ? char_bgr : bg_color);
 
 
     // ----- CHARACTER ROM -----
