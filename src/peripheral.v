@@ -113,35 +113,7 @@ module tqvp_example (
         .vpos(pix_y)
     );
 
-    wire frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
-
-    reg [2:0] rel_x;
-    reg [2:0] cnt1;
-    reg [COLS_ADDR_WIDTH-1:0] char_x;
-
-    always @(posedge clk) begin
-        if (~rst_n) begin
-            rel_x <= 0;
-            cnt1 <= 0;
-            char_x <= 0;
-        end else begin
-            if (pix_x == VGA_FRAME_XMIN-1) begin
-                rel_x <= 0;
-                cnt1 <= 0;
-                char_x <= 0;
-            end else begin
-                cnt1 <= cnt1 + 1;
-                if (&cnt1) begin
-                    if (rel_x == 5) begin
-                        rel_x <= 0;
-                        char_x <= char_x + 1;
-                    end else begin
-                        rel_x <= rel_x + 1;
-                    end
-                end
-            end
-        end
-    end
+    wire frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX);
 
     // (x,y) coordinates relative to frame
     wire [9:0] pix_x_frame, pix_y_frame;
@@ -151,24 +123,46 @@ module tqvp_example (
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
  
-    // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
+    // char_x is column of current character in the NUM_ROWS x NUM_COLS text buffer,
+    // rel_x is current pixel's x coordinate within current character.
+    // We use counters to avoid divisions and remainders.
+    reg [2:0] rel_x;
+    wire rel_x_5 = (rel_x == 3'd5);
+    reg [2:0] cnt1;
+    reg [COLS_ADDR_WIDTH-1:0] char_x;
+    always @(posedge clk) begin
+        if (pix_x == VGA_FRAME_XMIN-1) begin
+            cnt1   <= 0;
+            rel_x  <= 0;
+            char_x <= '0;
+        end else begin
+            cnt1 <= cnt1 + 1;
+            if (&cnt1) begin
+                rel_x  <= rel_x_5 ? 0 : rel_x + 1;
+                char_x <= char_x + rel_x_5;
+            end
+        end
+    end
+
+    // Row of current character in the NUM_ROWS x NUM_COLS text buffer
     wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[6+ROWS_ADDR_WIDTH-1:6];  // divide by 64 (VGA char height is 64 pixels)
 
+    // Here we hardcode NUM_COLS = 10 to save gates, the general case is: text[char_y * NUL_COLS + char_x]
     wire [9:0] char  = text[({{(10-COLS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(10-COLS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x];
     wire [6:0] char_index = char[6:0];  // Drive character ROM input
     wire [2:0] char_color = char[9:7];  // Character color
 
-    // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
-    wire [2:0] rel_y = pix_y_frame[5:3];    // remainder of division by 8
+    // Current pixel's y coordinate within current character (5x7 glyph padded in a 6x8 character box)
+    wire [2:0] rel_y = pix_y_frame[5:3];  // remainder of division by 8
 
-    // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
+    // Current pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
     wire [5:0] offset = (rel_y << 2) + rel_y + rel_x;
 
-    // Look up character pixel value in character ROM,
+    // Current pixel's state in character ROM,
     // handling 1-pixel padding along x and y directions.
-    wire char_pixel = (&rel_y || (rel_x == 5)) ? 0 : char_data[offset];
+    wire char_pixel = (&rel_y || rel_x_5) ? 0 : char_data[offset];
 
-    // generate RGB signals
+    // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
     wire [5:0] char_rgb = { {2{char_color[2]}}, {2{char_color[1]}}, {2{char_color[0]}} };
     assign {B, G, R} = ~video_active ? 6'b0 : (pixel_on ? char_rgb : bg_color);
