@@ -43,24 +43,15 @@ module tqvp_example (
 
     // Text buffer (printable ASCII code in the lowest 7 bits, color in the top 2 bits)
     reg [8:0] text[0:NUM_CHARS-1];
-    //reg [5:0] bg_color;
 
     // ----- HOST INTERFACE -----
     
     wire in_text_range = (address < NUM_CHARS);
-    wire any_write = ~(data_write_n[1] & data_write_n[0]);
+    wire any_write = ~&data_write_n;
     wire we_text = in_text_range & any_write;
-    wire we_bg = &address & any_write;
 
     // byte writes use the default text color, wider writes also provide color bits
-    wire [1:0] next_color = (data_write_n == 2'b00) ? DEFAULT_TEXT_COLOR : data_in[9:8];
-
-    // always @(posedge clk) begin
-    //     if (!rst_n)
-    //         bg_color <= DEFAULT_BG_COLOR;
-    //     else if (we_bg)
-    //         bg_color <= data_in[5:0];
-    // end
+    wire [1:0] next_color = (~|data_write_n) ? DEFAULT_TEXT_COLOR : data_in[9:8];
 
     // Handle writes to character/color registers
     always @(posedge clk) begin
@@ -78,7 +69,7 @@ module tqvp_example (
     // No interrupt handling
     assign user_interrupt = 0;
 
-    wire _unused = &{data_read_n, 1'b0};
+    wire _unused = &{data_read_n};
 
 
     // ----- VGA INTERFACE -----
@@ -113,29 +104,33 @@ module tqvp_example (
         .vpos(pix_y)
     );
 
+    wire y_in_frame = (~pix_y[8] &  pix_y[7]) | (pix_y[8] & ~pix_y[7] & ~pix_y[6]);
+    wire x_ge_80  = (pix_x[7] | pix_x[8] | pix_x[9]) | (pix_x[6] & (pix_x[5] | pix_x[4]));
+    wire x_ge_560 = pix_x[9] & (pix_x[6] | (pix_x[5] & pix_x[4]));
+    wire x_in_frame = x_ge_80 & ~x_ge_560;
+    wire frame_active = x_in_frame & y_in_frame;
 
-    // compute (x,y) coordinates relative to frame, and frame_active flag
+    // wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
+    // wire pix_x_below_xmin = pix_x_diff[10];     // pix_x < XMIN
 
-    wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
-    wire pix_x_below_xmin = pix_x_diff[10];     // pix_x < XMIN
+    // wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
+    // wire pix_y_below_ymin = pix_y_diff[10];     // pix_y < YMIN
+    // wire [5:0] pix_y_frame = pix_y_diff[8:3];   // (pix_y - YMIN) / 8
 
-    wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
-    wire pix_y_below_ymin = pix_y_diff[10];     // pix_y < YMIN
-    wire [5:0] pix_y_frame = pix_y_diff[8:3];   // (pix_y - YMIN) / 8
-
-    wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
+    //wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
 
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
 
     // x position machinery
+    wire at_frame_xmin_minus_1 = (pix_x == (VGA_FRAME_XMIN - 1));
     reg [5:0] cx48;
     reg [COLS_ADDR_WIDTH-1:0] char_x;
     wire [2:0] rel_x = cx48[5:3];
     wire rel_x_5 = (rel_x == 3'd5);
 
     always @(posedge clk) begin
-        if (&pix_x_diff) begin  // pix_x == VGA_FRAME_XMIN - 1
+        if (at_frame_xmin_minus_1) begin  // pix_x == VGA_FRAME_XMIN - 1
             cx48 <= 0;
             char_x <= 0;
         end else begin
@@ -149,7 +144,8 @@ module tqvp_example (
     end
 
     // Row of current character in the NUM_ROWS x NUM_COLS text buffer
-    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[3+ROWS_ADDR_WIDTH-1:3];  // divide by 64 (VGA char height is 64 pixels)
+    //wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[3+ROWS_ADDR_WIDTH-1:3];  // divide by 64 (VGA char height is 64 pixels)
+    wire [ROWS_ADDR_WIDTH-1:0] char_y = (pix_y[9:6] == 4'd2) ? 2'd0 : (pix_y[9:6] == 4'd3) ? 2'd1 : 2'd2;
 
     // Here we hardcode NUM_COLS = 10 to save gates, the general case is: text[char_y * NUL_COLS + char_x]
     wire [4:0] char_addr = ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(5-ROWS_ADDR_WIDTH){1'b0}},char_y} << 1) + char_x;
@@ -158,7 +154,7 @@ module tqvp_example (
     wire [1:0] char_color = char[8:7];  // Character color
 
     // Current pixel's y coordinate within current character (5x7 glyph padded in a 6x8 character box)
-    wire [2:0] rel_y = pix_y_frame[2:0];  // remainder of division by 8
+    wire [2:0] rel_y = pix_y[5:3];  // remainder of division by 8 (relies on VGA_FRAME_YMIN == 128)
 
     // Current pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
     wire [5:0] offset = ({3'b0, rel_y} << 2) + {3'b0, rel_y} + {3'b0, rel_x};
