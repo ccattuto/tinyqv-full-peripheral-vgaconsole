@@ -39,7 +39,7 @@ module tqvp_example (
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
     localparam [1:0] DEFAULT_TEXT_COLOR = 2'b00;
-    //localparam [5:0] DEFAULT_BG_COLOR = 6'b000000;
+    localparam [5:0] BG_COLOR = 6'b010000;
 
     // Text buffer (printable ASCII code in the lowest 7 bits, color in the top 2 bits)
     reg [8:0] text[0:NUM_CHARS-1];
@@ -169,10 +169,17 @@ module tqvp_example (
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
-    wire [2:0] pixel_color = color_rom[char_color];
     wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
-    //assign {B, G, R} = ~video_active ? 6'b0 : (pixel_on ? char_bgr : bg_color);
-    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : 6'b0;
+    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : BG_COLOR;
+
+    // 3'b010 = green
+    // 3'b110 = teal
+    // 3'b011 = yellow
+    // 3'b101 = magenta
+    wire [2:0] pixel_color;
+    assign pixel_color[0] = char_color[1];
+    assign pixel_color[1] = ~(char_color[0] & char_color[1]);
+    assign pixel_color[2] = char_color[0];
 
 
     // ----- CHARACTER ROM -----
@@ -183,13 +190,5 @@ module tqvp_example (
         .address(char_index),
         .data(char_data) 
     );
-
-    reg [2:0] color_rom[4];
-    initial begin
-        color_rom[2'b00]  = 3'b010;  // green
-        color_rom[2'b01]  = 3'b101;  // magenta
-        color_rom[2'b10]  = 3'b110;  // teal
-        color_rom[2'b11]  = 3'b011;  // yellow
-    end
 
 endmodule
