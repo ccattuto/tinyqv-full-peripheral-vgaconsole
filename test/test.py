@@ -45,7 +45,7 @@ async def test_project(dut):
 
     dut._log.info("Test project behavior")
 
-    # Test register write and read back
+    # test register write and read back
     dut._log.info("Write/read registers")
     random.seed(42)
 
@@ -65,7 +65,7 @@ async def test_project(dut):
     for i in range(30):
         await tqv.write_word_reg(i, 32)
     
-    # pay homage to TinyTapeout
+    # write text
     for (i, ch) in enumerate("VGA"):
         await tqv.write_byte_reg(0+i, ord(ch))
     for (i, ch) in enumerate("CONSOLE"):
@@ -79,11 +79,41 @@ async def test_project(dut):
     # await tqv.write_byte_reg(3, ord('O'))
     # await tqv.write_byte_reg(4, ord('!'))
 
+    # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab.png", vgaframe * 64)
-
-    vgaframe_ref = imageio.imread("vga_ref.png") / 64
+    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
+
+    # change text color to transparent teal
+    await tqv.write_byte_reg(0x30, 0x80 | 0b111100)
+    assert await tqv.read_byte_reg(0x30) ==  0x80 | 0b111100
+
+    # change background color to red
+    await tqv.write_byte_reg(0x31, 0b000011)
+    assert await tqv.read_byte_reg(0x31) == 0b000011
+
+    # write non-printable ASCII characters in top-right corner
+    await tqv.write_byte_reg(9, 0)
+    await tqv.write_byte_reg(8, 31)
+    await tqv.write_byte_reg(10+9, 13)
+
+     # grab next VGA frame and compare with reference image
+    vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
+    #imageio.imwrite("vga_grab2.png", vgaframe * 64)
+    vgaframe_ref = imageio.imread("vga_ref2.png") / 64
+    assert np.all(vgaframe == vgaframe_ref)
+
+    # check vsync latching
+    dut._log.info("wait for vsync")
+    while vsync.value == 0:
+        await Edge(dut.uo_out)
+    while vsync.value == 1:
+        await Edge(dut.uo_out)
+    # read the VGA status register
+    assert await tqv.read_byte_reg(0x32) & 0x4 != 0
+    # vsync_latched bit should be cleared after reading the VGA status register
+    assert await tqv.read_byte_reg(0x32) & 0x4 == 0
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):

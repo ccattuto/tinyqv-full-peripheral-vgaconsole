@@ -38,33 +38,67 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
+    localparam REG_TEXT_COLOR = 6'h30;
+    localparam REG_BG_COLOR = 6'h31;
+    localparam REG_VGA = 6'h32;
+
     // Text buffer (7-bit chars)
     reg [6:0] text[0:NUM_CHARS-1];
+    reg [5:0] text_color;   // text color
+    reg [5:0] bg_color;     // background color
+    reg transparent;        // transparency flag
 
 
     // ----- HOST INTERFACE -----
     
-    // Writes to memory-mapped text buffer: only write lowest 8 bits
-    always @(posedge clk) begin
+    // Writes (only write lowest 8 bits)
+    always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            ;
+            bg_color <= 6'b010000;
+            text_color <= 6'b001100;
+            transparent <= 0;
         end else begin
-            if ((address < NUM_CHARS) && (data_write_n != 2'b11)) begin
-                text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
+            if (data_write_n != 2'b11) begin
+                if (address < NUM_CHARS) begin
+                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
+                end else if (address == REG_TEXT_COLOR) begin
+                    text_color <= data_in[5:0];
+                    transparent <= data_in[7];
+                end else if (address == REG_BG_COLOR) begin
+                    bg_color <= data_in[5:0];
+                end
             end
         end
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 32'h0;
+    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
+                      (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
+                      (address == REG_BG_COLOR) ? {26'h0, bg_color} :
+                      (address == REG_VGA) ? {28'h0, hsync_latched, vsync_latched, hsync, vsync} :
+                      32'h0;
+
+    reg vsync_latched, hsync_latched; // latched vsync/hsync signals
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            vsync_latched <= 0;
+            hsync_latched <= 0;
+        end else begin
+            if (address == REG_VGA && data_read_n != 2'b11) begin  // clear latched values on read
+                vsync_latched <= 0;
+                hsync_latched <= 0;
+            end else begin
+                if (vsync & ~vsync_latched) vsync_latched <= 1;
+                if (hsync & ~hsync_latched) hsync_latched <= 1;
+            end
+        end
+    end
 
     // All reads complete in 1 clock
     assign data_ready = 1;
 
     // No interrupt handling
     assign user_interrupt = 0;
-
-    wire _unused = &{data_read_n, 1'b0};
 
 
     // ----- VGA INTERFACE -----
@@ -124,7 +158,7 @@ module tqvp_example (
     wire [2:0] rel_x;
     wire [2:0] rel_y;
     assign rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
-    assign rel_y = pix_y_frame[9:3] & 7;    // remainder of division by 8
+    assign rel_y = pix_y_frame[5:3];    // remainder of division by 8
 
     // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
     wire [5:0] offset;
@@ -135,10 +169,10 @@ module tqvp_example (
     wire char_pixel;
     assign char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
 
-    // generate RGB signals
-    assign R = 2'b00;
-    assign G = (video_active & frame_active & char_pixel) ? 2'b11 : 2'b00;
-    assign B = video_active ? 2'b01 : 2'b00;
+    // Generate RGB signals
+    wire pixel_on = frame_active & char_pixel;
+    assign {B, G, R} = ~video_active ? 6'b000000 :
+                       ( pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color);
 
 
     // ----- CHARACTER ROM -----
