@@ -87,6 +87,7 @@ module tqvp_example (
     wire [1:0] R;
     wire [1:0] G;
     wire [1:0] B;
+    wire video_active;
     wire [9:0] pix_x;
     wire [9:0] pix_y;
 
@@ -98,6 +99,7 @@ module tqvp_example (
         .reset(~rst_n),
         .hsync(hsync),
         .vsync(vsync),
+        .display_on(video_active),
         .hpos(pix_x),
         .vpos(pix_y)
     );
@@ -164,7 +166,7 @@ module tqvp_example (
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
     wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
-    assign {B, G, R} = pixel_on ? char_bgr : BG_COLOR;
+    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : BG_COLOR;
 
     // 3'b010 = green
     // 3'b110 = teal
