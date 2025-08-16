@@ -38,9 +38,6 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam [1:0] DEFAULT_TEXT_COLOR = 2'b00;
-    localparam [5:0] BG_COLOR = 6'b010000;
-
     // Text buffer (printable ASCII code in the lowest 7 bits, color in the top 2 bits)
     reg [8:0] text[0:NUM_CHARS-1];
 
@@ -51,7 +48,7 @@ module tqvp_example (
     wire we_text = in_text_range & any_write;
 
     // byte writes use the default text color, wider writes also provide color bits
-    wire [1:0] next_color = (~|data_write_n) ? DEFAULT_TEXT_COLOR : data_in[9:8];
+    wire [1:0] next_color = (~|data_write_n) ? 2'b00 : data_in[9:8];
 
     // Handle writes to character/color registers
     always @(posedge clk) begin
@@ -87,7 +84,6 @@ module tqvp_example (
     wire [1:0] R;
     wire [1:0] G;
     wire [1:0] B;
-    wire video_active;
     wire [9:0] pix_x;
     wire [9:0] pix_y;
 
@@ -99,7 +95,6 @@ module tqvp_example (
         .reset(~rst_n),
         .hsync(hsync),
         .vsync(vsync),
-        .display_on(video_active),
         .hpos(pix_x),
         .vpos(pix_y)
     );
@@ -109,15 +104,6 @@ module tqvp_example (
     wire x_ge_560 = pix_x[9] & (pix_x[6] | (pix_x[5] & pix_x[4]));
     wire x_in_frame = x_ge_80 & ~x_ge_560;
     wire frame_active = x_in_frame & y_in_frame;
-
-    // wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
-    // wire pix_x_below_xmin = pix_x_diff[10];     // pix_x < XMIN
-
-    // wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
-    // wire pix_y_below_ymin = pix_y_diff[10];     // pix_y < YMIN
-    // wire [5:0] pix_y_frame = pix_y_diff[8:3];   // (pix_y - YMIN) / 8
-
-    //wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
 
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
@@ -144,7 +130,6 @@ module tqvp_example (
     end
 
     // Row of current character in the NUM_ROWS x NUM_COLS text buffer
-    //wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[3+ROWS_ADDR_WIDTH-1:3];  // divide by 64 (VGA char height is 64 pixels)
     wire [ROWS_ADDR_WIDTH-1:0] char_y = (pix_y[9:6] == 4'd2) ? 2'd0 : (pix_y[9:6] == 4'd3) ? 2'd1 : 2'd2;
 
     // Here we hardcode NUM_COLS = 10 to save gates, the general case is: text[char_y * NUL_COLS + char_x]
@@ -163,11 +148,6 @@ module tqvp_example (
     // handling 1-pixel padding along x and y directions.
     wire char_pixel = (&rel_y || rel_x_5) ? 0 : char_data[offset];
 
-    // Generate RGB signals
-    wire pixel_on = frame_active & char_pixel;
-    wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
-    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : BG_COLOR;
-
     // 3'b010 = green
     // 3'b110 = teal
     // 3'b011 = yellow
@@ -176,6 +156,11 @@ module tqvp_example (
     assign pixel_color[0] = char_color[1];
     assign pixel_color[1] = ~(char_color[0] & char_color[1]);
     assign pixel_color[2] = char_color[0];
+
+    // Generate RGB signals
+    wire pixel_on = frame_active & char_pixel;
+    wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
+    assign {B, G, R} = pixel_on ? char_bgr : 6'b000000;
 
 
     // ----- CHARACTER ROM -----
