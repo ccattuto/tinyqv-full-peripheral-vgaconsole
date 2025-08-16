@@ -131,6 +131,8 @@ module tqvp_example (
     wire [1:0] B;
     wire [10:0] pix_x;
     wire [10:0] pix_y;
+    wire [5:0] y_lo;
+    wire [4:0] y_hi;
 
     // TinyVGA PMOD
     assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
@@ -145,14 +147,15 @@ module tqvp_example (
         .cli(clear_interrupt),
         .x_lo(pix_x[4:0]),
         .x_hi(pix_x[10:5]),
-        .y_lo(pix_y[5:0]),
-        .y_hi(pix_y[10:6])
+        .y_lo(y_lo),
+        .y_hi(y_hi)
     );
 
     wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
                             pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
 
     // (x,y) coordinates relative to frame
+    assign pix_y = ({6'b0, y_hi} << 5) + ({6'b0, y_hi} << 4) + {5'b0, y_lo};  // pix_y = y_hi * 48 + y_lo
     wire [10:0] pix_y_frame = pix_y - VGA_FRAME_YMIN;
 
     // Character pixels are 16x16 squares in the VGA frame.
@@ -179,7 +182,7 @@ module tqvp_example (
     end
 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[8:7];       // divide by 128 (VGA char height is 128 pixels)
+    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[8:7];  // divide by 128 (VGA char height is 128 pixels)
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
