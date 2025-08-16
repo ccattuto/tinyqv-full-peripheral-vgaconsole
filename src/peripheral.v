@@ -102,17 +102,19 @@ module tqvp_example (
     // VGA signals
     wire hsync;
     wire vsync;
+    reg hsync_buf;
+    reg vsync_buf;
     wire blank;
-    wire [1:0] R;
-    wire [1:0] G;
-    wire [1:0] B;
+    reg [1:0] R;
+    reg [1:0] G;
+    reg [1:0] B;
     wire [10:0] pix_x;
     wire [10:0] pix_y;
     wire [5:0] y_lo;
     wire [4:0] y_hi;
 
     // TinyVGA PMOD
-    assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
+    assign uo_out = {hsync_buf, B[0], G[0], R[0], vsync_buf, B[1], G[1], R[1]};
 
     vga_timing hvsync_gen (
         .clk(clk),
@@ -178,9 +180,22 @@ module tqvp_example (
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
-    assign {B, G, R} = blank ? 6'b000000 :
-                       ( pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color);
 
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            {B, G, R} <= 6'b000000;
+            vsync_buf <= 0;
+            hsync_buf <= 0;
+        end else begin
+            vsync_buf <= vsync;
+            hsync_buf <= hsync;
+            if (blank) begin
+                {B, G, R} <= 6'b000000;
+            end else begin
+                {B, G, R} <= pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color;
+            end
+        end
+    end
 
     // ----- CHARACTER ROM -----
 
