@@ -44,9 +44,12 @@ module tqvp_example (
 
     // Text buffer (7-bit chars)
     reg [6:0] text[0:NUM_CHARS-1];
-    reg [5:0] text_color;   // text color
-    reg [5:0] bg_color;     // background color
-    reg transparent;        // transparency flag
+
+    reg [5:0] text_color;   // Text color
+    reg [5:0] bg_color;     // Background color
+    reg transparent;        // Transparency flag
+    
+    reg interrupt_enable;
 
 
     // ----- HOST INTERFACE -----
@@ -57,6 +60,7 @@ module tqvp_example (
             bg_color <= 6'b010000;
             text_color <= 6'b001100;
             transparent <= 0;
+            interrupt_enable <= 0;
         end else begin
             if (data_write_n != 2'b11) begin
                 if (address < NUM_CHARS) begin
@@ -66,6 +70,8 @@ module tqvp_example (
                     transparent <= data_in[7];
                 end else if (address == REG_BG_COLOR) begin
                     bg_color <= data_in[5:0];
+                end else if (address == REG_VGA) begin
+                    interrupt_enable <= data_in[7];
                 end
             end
         end
@@ -75,21 +81,26 @@ module tqvp_example (
     assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
                       (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
                       (address == REG_BG_COLOR) ? {26'h0, bg_color} :
-                      (address == REG_VGA) ? {28'h0, hsync_latched, vsync_latched, hsync, vsync} :
+                      (address == REG_VGA) ? {24'h0, interrupt_enable, 3'h0, hsync_latched, vsync_latched, hsync, vsync} :
                       32'h0;
 
+    // VGA status register
     reg vsync_latched, hsync_latched; // latched vsync/hsync signals
+    reg clear_interrupt;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            vsync_latched <= 0;
-            hsync_latched <= 0;
+            vsync_latched <= 0;  // active high
+            hsync_latched <= 1;  // active low
+            clear_interrupt <= 0;
         end else begin
             if (address == REG_VGA && data_read_n != 2'b11) begin  // clear latched values on read
                 vsync_latched <= 0;
-                hsync_latched <= 0;
+                hsync_latched <= 1;
+                clear_interrupt <= 1;
             end else begin
-                if (vsync & ~vsync_latched) vsync_latched <= 1;
-                if (hsync & ~hsync_latched) hsync_latched <= 1;
+                if (vsync) vsync_latched <= 1;
+                if (~hsync) hsync_latched <= 0;
+                clear_interrupt <= 0;
             end
         end
     end
@@ -97,81 +108,97 @@ module tqvp_example (
     // All reads complete in 1 clock
     assign data_ready = 1;
 
-    // No interrupt handling
-    assign user_interrupt = 0;
+    // Interrupt handling
+    wire vga_interrupt;
+    assign user_interrupt = vga_interrupt & interrupt_enable;
 
 
     // ----- VGA INTERFACE -----
 
-    localparam VGA_WIDTH = 640;
-    localparam VGA_HEIGHT = 480;
-    localparam VGA_FRAME_XMIN = 80;
-    localparam VGA_FRAME_XMAX = VGA_WIDTH - 80;
-    localparam VGA_FRAME_YMIN = 128;
-    localparam VGA_FRAME_YMAX = VGA_HEIGHT - 160;
+    localparam VGA_WIDTH = 1024;
+    localparam VGA_HEIGHT = 768;
+    localparam VGA_FRAME_XMIN = 32;
+    localparam VGA_FRAME_XMAX = VGA_WIDTH - 32;
+    localparam VGA_FRAME_YMIN = 192;
+    localparam VGA_FRAME_YMAX = VGA_HEIGHT - 192;
 
     // VGA signals
     wire hsync;
     wire vsync;
+    wire blank;
     wire [1:0] R;
     wire [1:0] G;
     wire [1:0] B;
-    wire video_active;
-    wire [9:0] pix_x;
-    wire [9:0] pix_y;
+    wire [10:0] pix_x;
+    wire [10:0] pix_y;
 
     // TinyVGA PMOD
     assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
-    hvsync_generator hvsync_gen(
+    vga_timing hvsync_gen (
         .clk(clk),
-        .reset(~rst_n),
+        .rst_n(rst_n),
         .hsync(hsync),
         .vsync(vsync),
-        .display_on(video_active),
-        .hpos(pix_x),
-        .vpos(pix_y)
+        .blank(blank),
+        .interrupt(vga_interrupt),
+        .cli(clear_interrupt),
+        .x_lo(pix_x[4:0]),
+        .x_hi(pix_x[10:5]),
+        .y_lo(pix_y[5:0]),
+        .y_hi(pix_y[10:6])
     );
 
-    wire frame_active;
-    assign frame_active = (pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX && pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
+    wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
+                            pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
 
     // (x,y) coordinates relative to frame
-    wire [9:0] pix_x_frame, pix_y_frame;
-    assign pix_x_frame = pix_x - VGA_FRAME_XMIN;
-    assign pix_y_frame = pix_y - VGA_FRAME_YMIN;
+    wire [10:0] pix_y_frame = pix_y - VGA_FRAME_YMIN;
 
-    // Character pixels are 8x8 squares in the VGA frame.
+    // Character pixels are 16x16 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
 
+    // x position machinery
+    reg [6:0] cx96;
+    reg [COLS_ADDR_WIDTH-1:0] char_x;
+    wire [2:0] rel_x = cx96[6:4];
+    wire rel_x_5 = (rel_x == 3'd5);
+
+    always @(posedge clk) begin
+        if (pix_x == VGA_FRAME_XMIN - 1) begin  // pix_x == VGA_FRAME_XMIN - 1
+            cx96 <= 0;
+            char_x <= 0;
+        end else begin
+            if (cx96 == 95) begin
+                cx96 <= 0;
+                char_x <= char_x + 1;
+            end else begin
+                cx96 <= cx96 + 1;
+            end
+        end
+    end
+
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [COLS_ADDR_WIDTH-1:0] char_x;
-    wire [ROWS_ADDR_WIDTH-1:0] char_y;
-    assign char_x = (pix_x_frame / 6) >> 3; // divide by 48 (VGA char width is 48 pixels)
-    assign char_y = pix_y_frame >> 6;       // divide by 64 (VGA char height is 64 pixels)
+    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[8:7];       // divide by 128 (VGA char height is 128 pixels)
 
     // Drive character ROM input
-    wire [6:0] char_index;
-    assign char_index = text[char_y * NUM_COLS + char_x];
+    //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
+    wire [4:0] char_addr = ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
+    wire [6:0] char_index = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
-    wire [2:0] rel_x;
-    wire [2:0] rel_y;
-    assign rel_x = pix_x_frame[9:3] % 6;    // remainder of division by 6
-    assign rel_y = pix_y_frame[5:3];    // remainder of division by 8
+    wire [2:0] rel_y = pix_y_frame[6:4];  // remainder of division by 8
 
     // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
-    wire [5:0] offset;
-    assign offset = (rel_y << 2) + rel_y + rel_x;
+    wire [5:0] offset = ({3'b0, rel_y} << 2) + {3'b0, rel_y} + {3'b0, rel_x};
 
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
-    wire char_pixel;
-    assign char_pixel = ((rel_y == 7) || (rel_x == 5)) ? 0 : char_data[offset];
+    wire char_pixel = (&rel_y || rel_x_5) ? 1'b0 : char_data[offset];
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
-    assign {B, G, R} = ~video_active ? 6'b000000 :
+    assign {B, G, R} = blank ? 6'b000000 :
                        ( pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color);
 
 

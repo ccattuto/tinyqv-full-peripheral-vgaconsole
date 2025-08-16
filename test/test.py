@@ -29,8 +29,8 @@ async def test_project(dut):
     G1 = dut.uo_out[1]
     B1 = dut.uo_out[2]
 
-    # 24 MHz
-    clock = Clock(dut.clk, 41666, units="ps")
+    # ~64 MHz
+    clock = Clock(dut.clk, 15700, units="ps")
     cocotb.start_soon(clock.start())
 
     # Interact with your design's registers through this TinyQV class.
@@ -66,12 +66,12 @@ async def test_project(dut):
         await tqv.write_word_reg(i, 32)
     
     # write text
-    for (i, ch) in enumerate("VGA"):
+    for (i, ch) in enumerate("PPPP---VGA"):
         await tqv.write_byte_reg(0+i, ord(ch))
-    for (i, ch) in enumerate("CONSOLE"):
-        await tqv.write_byte_reg(10+i, ord(ch))
-    for (i, ch) in enumerate("PERIPHERAL"):
-        await tqv.write_byte_reg(20+i, ord(ch))
+    # for (i, ch) in enumerate("CONSOLE"):
+    #     await tqv.write_byte_reg(10+i, ord(ch))
+    # for (i, ch) in enumerate("PERIPHERAL"):
+    #     await tqv.write_byte_reg(20+i, ord(ch))
 
     # await tqv.write_byte_reg(0, ord('C'))
     # await tqv.write_byte_reg(1, ord('I'))
@@ -81,7 +81,7 @@ async def test_project(dut):
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    imageio.imwrite("vga_grab1.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
@@ -100,7 +100,7 @@ async def test_project(dut):
 
      # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab2.png", vgaframe * 64)
+    imageio.imwrite("vga_grab2.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref2.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
@@ -117,31 +117,33 @@ async def test_project(dut):
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
-    vga_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    vga_frame = np.zeros((768, 1024, 3), dtype=np.uint8)
 
     dut._log.info("grab VGA frame: wait for vsync")
     while vsync.value == 0:
         await Edge(dut.uo_out)
     while vsync.value == 1:
         await Edge(dut.uo_out)
+    while vsync.value == 0:  # wait for vsync pulse to finish
+        await Edge(dut.uo_out)
     dut._log.info("grab VGA frame: start")
 
-    for ypos in range(32+480):
-        while hsync.value == 0:
-            await Edge(dut.uo_out)
+    for ypos in range(23+768):
         while hsync.value == 1:
             await Edge(dut.uo_out)
+        while hsync.value == 0:
+            await Edge(dut.uo_out)
 
-        if ypos < 32:
+        if ypos < 23:
             continue
 
-        await Timer(41666 * 47, units="ps")
-        for xpos in range(640):
-            await Timer(41666 / 2, units="ps")
-            vga_frame[ypos-32][xpos][0] = R1.value << 1 | R0.value
-            vga_frame[ypos-32][xpos][1] = G1.value << 1 | G0.value
-            vga_frame[ypos-32][xpos][2] = B1.value << 1 | B0.value
-            await Timer(41666 / 2, units="ps")
+        await Timer(15748 * 152, units="ps")
+        for xpos in range(1024):
+            await Timer(15748 / 2, units="ps")
+            vga_frame[ypos-23][xpos][0] = R1.value << 1 | R0.value
+            vga_frame[ypos-23][xpos][1] = G1.value << 1 | G0.value
+            vga_frame[ypos-23][xpos][2] = B1.value << 1 | B0.value
+            await Timer(15748 / 2, units="ps")
 
     dut._log.info("grab VGA frame: done")
 
