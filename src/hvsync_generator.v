@@ -9,12 +9,11 @@ To use:
 - Add a 3-bit (or more) "rgb" output to the top level
 */
 
-module hvsync_generator(clk, reset, hsync, vsync, display_on, hpos, vpos);
+module hvsync_generator(clk, reset, hsync, vsync, hpos, vpos);
 
   input clk;
   input reset;
   output reg hsync, vsync;
-  output display_on;
   output reg [9:0] hpos;
   output reg [9:0] vpos;
 
@@ -60,9 +59,6 @@ module hvsync_generator(clk, reset, hsync, vsync, display_on, hpos, vpos);
       else
         vpos <= vpos + 1;
   end
-  
-  // display_on is set when beam is in "safe" visible frame
-  assign display_on = (hpos<H_DISPLAY) && (vpos<V_DISPLAY);
 
 endmodule
 
