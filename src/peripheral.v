@@ -110,14 +110,13 @@ module tqvp_example (
     wire x_in_frame = x_ge_80 & ~x_ge_560;
     wire frame_active = x_in_frame & y_in_frame;
 
+    // previous version, equivalent, more gates but more readable:
     // wire [10:0] pix_x_diff = {1'b0, pix_x} - {1'b0, VGA_FRAME_XMIN};
     // wire pix_x_below_xmin = pix_x_diff[10];     // pix_x < XMIN
-
     // wire [10:0] pix_y_diff = {1'b0, pix_y} - {1'b0, VGA_FRAME_YMIN};
     // wire pix_y_below_ymin = pix_y_diff[10];     // pix_y < YMIN
     // wire [5:0] pix_y_frame = pix_y_diff[8:3];   // (pix_y - YMIN) / 8
-
-    //wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
+    // wire frame_active = ~(pix_x_below_xmin | pix_y_below_ymin) && (pix_x < VGA_FRAME_XMAX) && (pix_y < VGA_FRAME_YMAX);
 
     // Character pixels are 8x8 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
@@ -163,11 +162,6 @@ module tqvp_example (
     // handling 1-pixel padding along x and y directions.
     wire char_pixel = (&rel_y || rel_x_5) ? 0 : char_data[offset];
 
-    // Generate RGB signals
-    wire pixel_on = frame_active & char_pixel;
-    wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
-    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : BG_COLOR;
-
     // 3'b010 = green
     // 3'b110 = teal
     // 3'b011 = yellow
@@ -176,6 +170,13 @@ module tqvp_example (
     assign pixel_color[0] = char_color[1];
     assign pixel_color[1] = ~(char_color[0] & char_color[1]);
     assign pixel_color[2] = char_color[0];
+
+    // Generate RGB signals
+    wire pixel_on = frame_active & char_pixel;
+    wire [5:0] char_bgr = { {2{pixel_color[2]}}, {2{pixel_color[1]}}, {2{pixel_color[0]}} };
+    assign {B, G, R} = (video_active & pixel_on) ? char_bgr : BG_COLOR;
+
+    
 
 
     // ----- CHARACTER ROM -----
