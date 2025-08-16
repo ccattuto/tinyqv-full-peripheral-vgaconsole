@@ -104,24 +104,13 @@ async def test_project(dut):
     vgaframe_ref = imageio.imread("vga_ref2.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
-    # check vsync latching
-    dut._log.info("wait for vsync")
-    while vsync.value == 0:
-        await Edge(dut.uo_out)
-    while vsync.value == 1:
-        await Edge(dut.uo_out)
-    # read the VGA status register
-    assert await tqv.read_byte_reg(0x32) & 0x4 != 0
-    # vsync_latched bit should be cleared after reading the VGA status register
-    assert await tqv.read_byte_reg(0x32) & 0x4 == 0
-
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
     vga_frame = np.zeros((768, 1024, 3), dtype=np.uint8)
 
     dut._log.info("grab VGA frame: wait for vsync")
-    while vsync.value == 0:
-        await Edge(dut.uo_out)
+    #while vsync.value == 0:
+    #    await Edge(dut.uo_out)
     while vsync.value == 1:
         await Edge(dut.uo_out)
     while vsync.value == 0:  # wait for vsync pulse to finish

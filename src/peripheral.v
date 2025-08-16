@@ -49,8 +49,6 @@ module tqvp_example (
     reg [5:0] bg_color;     // Background color
     reg transparent;        // Transparency flag
     
-    reg interrupt_enable;
-
 
     // ----- HOST INTERFACE -----
     
@@ -60,7 +58,6 @@ module tqvp_example (
             bg_color <= 6'b010000;
             text_color <= 6'b001100;
             transparent <= 0;
-            interrupt_enable <= 0;
         end else begin
             if (data_write_n != 2'b11) begin
                 if (address < NUM_CHARS) begin
@@ -70,8 +67,6 @@ module tqvp_example (
                     transparent <= data_in[7];
                 end else if (address == REG_BG_COLOR) begin
                     bg_color <= data_in[5:0];
-                end else if (address == REG_VGA) begin
-                    interrupt_enable <= data_in[7];
                 end
             end
         end
@@ -81,36 +76,18 @@ module tqvp_example (
     assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
                       (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
                       (address == REG_BG_COLOR) ? {26'h0, bg_color} :
-                      (address == REG_VGA) ? {24'h0, interrupt_enable, 2'h0, blank, hsync_latched, vsync_latched, hsync, vsync} :
+                      (address == REG_VGA) ? {30'h0, vsync, blank} :
                       32'h0;
 
     // VGA status register
-    reg vsync_latched, hsync_latched; // latched vsync/hsync signals
-    reg clear_interrupt;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            vsync_latched <= 0;  // active high
-            hsync_latched <= 1;  // active low
-            clear_interrupt <= 0;
-        end else begin
-            if (address == REG_VGA && data_read_n != 2'b11) begin  // clear latched values on read
-                vsync_latched <= 0;
-                hsync_latched <= 1;
-                clear_interrupt <= 1;
-            end else begin
-                if (vsync) vsync_latched <= 1;
-                if (~hsync) hsync_latched <= 0;
-                clear_interrupt <= 0;
-            end
-        end
-    end
+    assign clear_interrupt = (address == REG_VGA) && (data_read_n != 2'b11);
 
     // All reads complete in 1 clock
     assign data_ready = 1;
 
     // Interrupt handling
-    wire vga_interrupt;
-    assign user_interrupt = vga_interrupt & interrupt_enable;
+    wire vga_interrupt, clear_interrupt;
+    assign user_interrupt = vga_interrupt;
 
 
     // ----- VGA INTERFACE -----
