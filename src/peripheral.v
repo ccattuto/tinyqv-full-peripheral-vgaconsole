@@ -81,7 +81,7 @@ module tqvp_example (
     assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
                       (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
                       (address == REG_BG_COLOR) ? {26'h0, bg_color} :
-                      (address == REG_VGA) ? {24'h0, interrupt_enable, 3'h0, hsync_latched, vsync_latched, hsync, vsync} :
+                      (address == REG_VGA) ? {24'h0, interrupt_enable, 2'h0, blank, hsync_latched, vsync_latched, hsync, vsync} :
                       32'h0;
 
     // VGA status register

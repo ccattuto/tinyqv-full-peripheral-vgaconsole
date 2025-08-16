@@ -24,9 +24,9 @@ The peripheral provides a 10x3 character VGA console supporting printable ASCII 
 ## Register map
 
 - The 10x3 character buffer is exposed via registers `CHAR0` to `CHAR29`. When writing to these registers, only the lowest 7 bits of the written value are processed.
-- `TXTCOL` controls the text color (6 bits, 2 bits per channel, BBGGRR order). Bit 7 control text transparency: text color is ORed with background color when bit 7 is set.
-- `BGCOL` controls the background color (6 bits, 2 bits per channel, BBGGRR order).
-- `VGA' provides access to VGA timing signals: bits 0 and 1 expose vsync and hsync, respectively. Transitions of these signals (to high for vsync, to low for hsync) are latched in bits 2 and 3 (vsync_latched, hsync_latched), which are cleared on reading the register. Bit 8 is writable and controls interrupt generation (disabled by default).
+- `TXTCOL` controls the text color (6 bits, 2 bits per channel, BBGGRR order). Bit 7 control text transparency: text color is ORed with background color when bit 7 is set. The default text color is green (001100).
+- `BGCOL` controls the background color (6 bits, 2 bits per channel, BBGGRR order). The default background color is dark blue (010000).
+- `VGA' provides access to VGA timing signals: bits 0 and 1 expose vsync and hsync, respectively. Transitions of these signals (to high for vsync, to low for hsync) are latched in bits 2 and 3 (vsync_latched, hsync_latched), which are cleared on reading the register. Bit 4 is the blank signal. Bit 7 is writable and controls interrupt generation (disabled by default).
 
 | Address | Name   | Access | Description                                                         |
 |---------|--------|--------|---------------------------------------------------------------------|
@@ -39,7 +39,7 @@ The peripheral provides a 10x3 character VGA console supporting printable ASCII 
 | 0x1D    | CHAR29 | R/W    | ASCII code of character at position 29                              |
 | 0x30    | TXTCOL | R/W    | Text color (low 6 bits), bit 7 (T) controls transparency: TxBBGGRR  |
 | 0x31    | BGCOL  | R/W    | Background color, low 6 bits: xxBBGGRR                              |
-| 0x32    | VGA    | R/W    | VGA status: interrupt enable (bit 7), x, x, x, hsync_latched, vsync_latched, hsync, vsync (bit 0) |         
+| 0x32    | VGA    | R/W    | VGA status: interrupt enable (bit 7), x, x, blank, hsync_latched, vsync_latched, hsync, vsync (bit 0) |         
 
 ## How to test
 
