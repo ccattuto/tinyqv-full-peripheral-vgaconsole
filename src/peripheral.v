@@ -38,16 +38,12 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam REG_TEXT_COLOR = 6'h30;
-    localparam REG_BG_COLOR = 6'h31;
-    localparam REG_VGA = 6'h32;
+    localparam REG_BG_COLOR = 6'h20;
+    localparam REG_VGA = 6'h3F;
 
     // Text buffer (7-bit chars)
-    reg [6:0] text[0:NUM_CHARS-1];
-
-    reg [5:0] text_color;   // Text color
+    reg [8:0] text[0:NUM_CHARS-1];
     reg [5:0] bg_color;     // Background color
-    reg transparent;        // Transparency flag
     
 
     // ----- HOST INTERFACE -----
@@ -56,15 +52,14 @@ module tqvp_example (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bg_color <= 6'b010000;
-            text_color <= 6'b001100;
-            transparent <= 0;
         end else begin
-            if (data_write_n != 2'b11) begin
+            if (~&data_write_n) begin
                 if (address < NUM_CHARS) begin
-                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
-                end else if (address == REG_TEXT_COLOR) begin
-                    text_color <= data_in[5:0];
-                    transparent <= data_in[7];
+                    if (|data_write_n) begin
+                        text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[8:0];
+                    end else begin
+                        text[address[CHARS_ADDR_WIDTH-1:0]] <= {2'b0, data_in[6:0]};
+                    end
                 end else if (address == REG_BG_COLOR) begin
                     bg_color <= data_in[5:0];
                 end
@@ -73,14 +68,10 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
-                      (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
-                      (address == REG_BG_COLOR) ? {26'h0, bg_color} :
-                      (address == REG_VGA) ? {30'h0, vsync, blank} :
-                      32'h0;
+    assign data_out = &address ? {30'h0, vsync, blank} : 32'h0;
 
     // VGA status register
-    assign clear_interrupt = (address == REG_VGA) && (data_read_n != 2'b11);
+    assign clear_interrupt = &address && (data_read_n != 2'b11);
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -166,7 +157,10 @@ module tqvp_example (
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
     wire [4:0] char_addr = ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
-    wire [6:0] char_index = text[char_addr];
+
+    wire [6:0] char_index;
+    wire [1:0] char_color_index;
+    assign {char_color_index, char_index} = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y_frame[6:4];  // remainder of division by 8
@@ -181,6 +175,11 @@ module tqvp_example (
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
 
+    wire [5:0] char_color = (char_color_index == 2'b00) ? 6'b001100 :   // green
+                            (char_color_index == 2'b01) ? 6'b111100 :   // teal
+                            (char_color_index == 2'b10) ? 6'b110011 :   // magenta
+                            6'b001111;                                  // yellow
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             {B, G, R} <= 6'b000000;
@@ -192,7 +191,7 @@ module tqvp_example (
             if (blank) begin
                 {B, G, R} <= 6'b000000;
             end else begin
-                {B, G, R} <= pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color;
+                {B, G, R} <= pixel_on ? char_color : bg_color;
             end
         end
     end

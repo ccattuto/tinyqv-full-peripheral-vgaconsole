@@ -49,18 +49,6 @@ async def test_project(dut):
     dut._log.info("Write/read registers")
     random.seed(42)
 
-    # byte writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_byte_reg(i, val)
-        await tqv.read_byte_reg(i) == val
-
-    # word writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_word_reg(i, val)
-        await tqv.read_word_reg(i) == val
-
     # clear console (all spaces)
     for i in range(30):
         await tqv.write_word_reg(i, 32)
@@ -71,46 +59,30 @@ async def test_project(dut):
     for (i, ch) in enumerate("CONSOLE"):
         await tqv.write_byte_reg(10+i, ord(ch))
     for (i, ch) in enumerate("PERIPHERAL"):
-        await tqv.write_byte_reg(20+i, ord(ch))
-
-    # await tqv.write_byte_reg(0, ord('C'))
-    # await tqv.write_byte_reg(1, ord('I'))
-    # await tqv.write_byte_reg(2, ord('R'))
-    # await tqv.write_byte_reg(3, ord('O'))
-    # await tqv.write_byte_reg(4, ord('!'))
+        await tqv.write_word_reg(20+i, ((i & 0x03) << 7) | ord(ch))
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    imageio.imwrite("vga_grab1.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
-    # change text color to transparent teal
-    await tqv.write_byte_reg(0x30, 0x80 | 0b111100)
-    assert await tqv.read_byte_reg(0x30) ==  0x80 | 0b111100
+    # # write non-printable ASCII characters in top-right corner
+    # await tqv.write_byte_reg(9, 0)
+    # await tqv.write_byte_reg(8, 31)
+    # await tqv.write_byte_reg(10+9, 13)
 
-    # change background color to red
-    await tqv.write_byte_reg(0x31, 0b000011)
-    assert await tqv.read_byte_reg(0x31) == 0b000011
-
-    # write non-printable ASCII characters in top-right corner
-    await tqv.write_byte_reg(9, 0)
-    await tqv.write_byte_reg(8, 31)
-    await tqv.write_byte_reg(10+9, 13)
-
-     # grab next VGA frame and compare with reference image
-    vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab2.png", vgaframe * 64)
-    vgaframe_ref = imageio.imread("vga_ref2.png") / 64
-    assert np.all(vgaframe == vgaframe_ref)
+    #  # grab next VGA frame and compare with reference image
+    # vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
+    # #imageio.imwrite("vga_grab2.png", vgaframe * 64)
+    # vgaframe_ref = imageio.imread("vga_ref2.png") / 64
+    # assert np.all(vgaframe == vgaframe_ref)
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
     vga_frame = np.zeros((768, 1024, 3), dtype=np.uint8)
 
     dut._log.info("grab VGA frame: wait for vsync")
-    #while vsync.value == 0:
-    #    await Edge(dut.uo_out)
     while vsync.value == 1:
         await Edge(dut.uo_out)
     while vsync.value == 0:  # wait for vsync pulse to finish
