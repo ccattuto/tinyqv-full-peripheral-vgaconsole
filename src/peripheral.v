@@ -149,12 +149,12 @@ module tqvp_example (
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-    wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
-    wire [4:0] char_addr_safe = (char_addr == NUM_CHARS[4:0]) ? 5'd0 : char_addr;
+    wire [3:0] char_x_safe = (char_x == 4'd10) ? 4'd0 : char_x;
+    wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x_safe;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
 
     wire [6:0] char_index;
     wire [1:0] char_color_index;
-    assign {char_color_index, char_index} = text[char_addr_safe];
+    assign {char_color_index, char_index} = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
