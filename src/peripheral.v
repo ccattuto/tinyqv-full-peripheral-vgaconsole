@@ -38,24 +38,18 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam REG_BGCOLOR = 6'h3F;
     localparam REG_VGA = 6'h3F;
 
     // Text buffer (bottom 7 bits: ASCII code, top 2 bits: color index)
     reg [8:0] text[0:NUM_CHARS-1];
-    reg [5:0] bgcolor;
     
 
     // ----- HOST INTERFACE -----
     
     // Writes (only write lowest 8 bits)
     always @(posedge clk) begin
-        if (~&data_write_n) begin
-            if (address < NUM_CHARS) begin
-                text[address[CHARS_ADDR_WIDTH-1:0]] <= {|data_write_n ? data_in[9:8] : 2'b0, data_in[6:0]};
-            end else if (&address) begin
-                bgcolor <= data_in[5:0];
-            end
+        if (~&data_write_n && address < NUM_CHARS) begin
+            text[address[CHARS_ADDR_WIDTH-1:0]] <= {|data_write_n ? data_in[9:8] : 2'b0, data_in[6:0]};
         end
     end
 
@@ -184,16 +178,9 @@ module tqvp_example (
                                 {2{char_color_index[0]}} };
 
     always @(posedge clk) begin
-        if (!rst_n) begin
-            hsync_buf <= 0;
-            vsync_buf <= 0;
-            {B, G, R} <= 6'b000000;
-            bgcolor <= 6'b010000;
-        end else begin
-            vsync_buf <= vsync;
-            hsync_buf <= hsync;
-            {B, G, R} <= blank ? 6'b000000 : (pixel_on ? char_color : bgcolor);
-        end
+        vsync_buf <= vsync;
+        hsync_buf <= hsync;
+        {B, G, R} <= (~blank & pixel_on) ? char_color : 6'b000000;
     end
 
     // ----- CHARACTER ROM -----
