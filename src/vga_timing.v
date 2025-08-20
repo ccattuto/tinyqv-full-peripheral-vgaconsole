@@ -28,6 +28,10 @@ module vga_timing (
 `define V_BPORCH (16 * 64 + 7)
 `define V_NEXT   (16 * 64 + 29)
 
+wire hpulse_next = (x_hi == 6'd41) & (x_lo == 5'd15);
+wire hpulse_sync = (x_hi == 6'd33) & (x_lo == 5'd16);
+wire vpulse_next = (y_hi == 5'd16) & (y_lo == 6'd29);
+
 always @(posedge clk) begin
     if (!rst_n) begin
         x_hi <= 0;
@@ -38,7 +42,7 @@ always @(posedge clk) begin
         vsync <= 0;
         interrupt <= 0;
     end else begin
-        if ({x_hi, x_lo} == `H_NEXT) begin
+        if (hpulse_next) begin
             x_hi <= 0;
             x_lo <= 0;
         end else if (x_lo == `H_ROLL) begin
@@ -47,8 +51,8 @@ always @(posedge clk) begin
         end else begin
             x_lo <= x_lo + 1;
         end
-        if ({x_hi, x_lo} == `H_SYNC) begin
-            if({y_hi, y_lo} == `V_NEXT) begin
+        if (hpulse_sync) begin
+            if(vpulse_next) begin
                 y_hi <= 0;
                 y_lo <= 0;
                 interrupt <= 1;
@@ -61,10 +65,8 @@ always @(posedge clk) begin
         end
 
         hsync <= !({x_hi, x_lo} >= `H_SYNC && {x_hi, x_lo} < `H_BPORCH);
-        //hsync <= ~hsync_region;
         
         vsync <= ({y_hi, y_lo} >= `V_SYNC && {y_hi, y_lo} < `V_BPORCH);
-        //vsync <= (y_hi == 5'd16) & (y_lo >= 6'd3) & (y_lo < 6'd7);
 
         //if (cli || {y_hi, y_lo} == 0) begin
         if (cli || ~((|y_hi) | (|y_lo))) begin
