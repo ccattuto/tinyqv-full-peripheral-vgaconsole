@@ -76,7 +76,7 @@ module tqvp_example (
     localparam [10:0] VGA_FRAME_XMIN = 32;
     localparam [10:0] VGA_FRAME_XMAX = VGA_WIDTH - 32;
     localparam [10:0] VGA_FRAME_YMIN = 128;
-    localparam [10:0] VGA_FRAME_YMAX = VGA_FRAME_YMIN + 128 * NUM_ROWS; // 128 pixels per character row
+    localparam [10:0] VGA_FRAME_YMAX = VGA_FRAME_YMIN + 128 * NUM_ROWS;  // 128 pixels per character row
 
     // VGA signals
     wire hsync;
@@ -149,8 +149,8 @@ module tqvp_example (
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-    wire [COLS_ADDR_WIDTH-1:0] char_x_clamped = (char_x == 4'd10) ? 4'd0 : char_x;
-    wire [4:0] char_addr = ({3'd0, char_y[1:0]} << 3) + ({3'd0, char_y[1:0]} << 1) + char_x_clamped;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
+    wire [4:0] char_addr = ({3'd0, char_y[1:0]} << 3) + ({3'd0, char_y[1:0]} << 1) + char_x;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
+    wire [4:0] char_addr_safe = (char_addr > NUM_CHARS[4:0]-1) ? 5'd0 : char_addr;
 
     wire [6:0] char_index;
     wire [1:0] char_color_index;
