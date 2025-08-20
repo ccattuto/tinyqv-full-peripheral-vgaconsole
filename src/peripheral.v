@@ -38,31 +38,22 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam REG_BG_COLOR = 6'h20;
     localparam REG_VGA = 6'h3F;
 
     // Text buffer (bottom 7 bits: ASCII code, top 2 bits: color index)
     reg [8:0] text[0:NUM_CHARS-1];
-
-    reg [5:0] bg_color;  // Background color
     
 
     // ----- HOST INTERFACE -----
     
     // Writes (only write lowest 8 bits)
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            bg_color <= 6'b010000;
-        end else begin
-            if (~&data_write_n) begin
-                if (address < NUM_CHARS) begin
-                    if (|data_write_n) begin
-                        text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[8:0];
-                    end else begin
-                        text[address[CHARS_ADDR_WIDTH-1:0]] <= {2'b0, data_in[6:0]};
-                    end
-                end else if (address == REG_BG_COLOR) begin
-                    bg_color <= data_in[5:0];
+    always @(posedge clk) begin
+        if (~&data_write_n) begin
+            if (address < NUM_CHARS) begin
+                if (|data_write_n) begin
+                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[8:0];
+                end else begin
+                    text[address[CHARS_ADDR_WIDTH-1:0]] <= {2'b0, data_in[6:0]};
                 end
             end
         end
@@ -202,7 +193,7 @@ module tqvp_example (
             if (blank) begin
                 {B, G, R} <= 6'b000000;
             end else begin
-                {B, G, R} <= pixel_on ? char_color : bg_color;
+                {B, G, R} <= pixel_on ? char_color : 6'b000000;
             end
         end
     end
