@@ -50,9 +50,7 @@ module tqvp_example (
     
     // Writes (only write lowest 8 bits)
     always @(posedge clk) begin
-        if (!rst_n) begin
-            bgcolor <= 6'b010000;
-        end else if (~&data_write_n) begin
+        if (~&data_write_n) begin
             if (address < NUM_CHARS) begin
                 text[address[CHARS_ADDR_WIDTH-1:0]] <= {|data_write_n ? data_in[9:8] : 2'b0, data_in[6:0]};
             end else if (&address) begin
@@ -190,6 +188,7 @@ module tqvp_example (
             hsync_buf <= 0;
             vsync_buf <= 0;
             {B, G, R} <= 6'b000000;
+            bgcolor <= 6'b010000;
         end else begin
             vsync_buf <= vsync;
             hsync_buf <= hsync;
