@@ -181,7 +181,7 @@ module tqvp_example (
     always @(posedge clk) begin
         vsync_buf <= vsync;
         hsync_buf <= hsync;
-        {B, G, R} <= (~blank & pixel_on) ? char_color : 6'b000000;
+        {B, G, R} <= (~blank & pixel_on) ? char_color : 6'b010000;
     end
 
     // ----- CHARACTER ROM -----
