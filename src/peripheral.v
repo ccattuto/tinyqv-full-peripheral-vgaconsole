@@ -48,20 +48,15 @@ module tqvp_example (
     
     // Writes (only write lowest 8 bits)
     always @(posedge clk) begin
-        if (~&data_write_n) begin
-            if (address < NUM_CHARS) begin
-                if (|data_write_n) begin
-                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[8:0];
-                end else begin
-                    text[address[CHARS_ADDR_WIDTH-1:0]] <= {2'b0, data_in[6:0]};
-                end
-            end
+        if (~&data_write_n && address < NUM_CHARS) begin
+            text[address[CHARS_ADDR_WIDTH-1:0]] <= {|data_write_n ? data_in[9:8] : 2'b0, data_in[6:0]};
         end
     end
 
     // Register reads
-    assign data_out = &address ? {30'h0, vsync, blank}  // REG_VGA
-                    : 32'h0;
+    assign data_out = 32'h0;
+    // assign data_out = &address ? {30'h0, vsync, blank}  // REG_VGA
+    //                 : 32'h0;
 
     // clear interrupt on reading REG_VGA
     assign clear_interrupt = &address & ~&data_read_n;

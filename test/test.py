@@ -57,9 +57,9 @@ async def test_project(dut):
     for (i, ch) in enumerate("VGA"):  # default green
         await tqv.write_byte_reg(0+i, ord(ch))
     for (i, ch) in enumerate("CONSOLE"):  # yellow
-        await tqv.write_word_reg(10+i, (0x01) << 7 | ord(ch))
+        await tqv.write_word_reg(10+i, (0x01) << 8 | ord(ch))
     for (i, ch) in enumerate("PERIPHERAL"):  # rainbow
-        await tqv.write_word_reg(20+i, (~(i & 0x03) << 7) | ord(ch))
+        await tqv.write_word_reg(20+i, (~(i & 0x03) << 8) | ord(ch))
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
