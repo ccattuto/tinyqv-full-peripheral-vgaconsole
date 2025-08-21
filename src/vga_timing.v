@@ -61,10 +61,8 @@ always @(posedge clk) begin
         end
 
         hsync <= !({x_hi, x_lo} >= `H_SYNC && {x_hi, x_lo} < `H_BPORCH);
-        //hsync <= ~hsync_region;
         
         vsync <= ({y_hi, y_lo} >= `V_SYNC && {y_hi, y_lo} < `V_BPORCH);
-        //vsync <= (y_hi == 5'd16) & (y_lo >= 6'd3) & (y_lo < 6'd7);
 
         //if (cli || {y_hi, y_lo} == 0) begin
         if (cli || ~((|y_hi) | (|y_lo))) begin
