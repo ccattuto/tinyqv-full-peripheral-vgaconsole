@@ -148,7 +148,7 @@ module tqvp_example (
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
     //wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
-    wire [4:0] char_addr  = ~frame_active ? (char_y * NUM_COLS + char_x) : 5'h0;
+    wire [4:0] char_addr  = frame_active ? (char_y * NUM_COLS + char_x) : 5'h0;
 
     wire [6:0] char_index;
     wire [1:0] char_color_index;
