@@ -143,7 +143,7 @@ module tqvp_example (
     end
 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [1:0] char_y = y_blk[1:0] - 2'd1;
+    wire [1:0] char_y = frame_active ? (y_blk[1:0] - 2'd1) : 2'h0;
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
@@ -151,8 +151,7 @@ module tqvp_example (
 
     wire [6:0] char_index;
     wire [1:0] char_color_index;
-    wire [4:0] char_addr_safe = char_addr & {5{frame_active}};
-    assign {char_color_index, char_index} = text[char_addr_safe];
+    assign {char_color_index, char_index} = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
