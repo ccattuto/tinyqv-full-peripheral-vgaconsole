@@ -143,8 +143,9 @@ module tqvp_example (
         end
     end
 
-    wire [4:0] char_addr_base =  (y_blk[1:0] == 2'd1) ? 5'd10 : (y_blk[1:0] == 2'd2) ? 5'd20 : 5'd0;
-    wire [4:0] char_addr = frame_active ? (char_addr_base + char_x) : 5'd0;
+    //wire [4:0] char_addr_base =  (y_blk[1:0] == 2'd2) ? 5'd10 : (y_blk[1:0] == 2'd3) ? 5'd20 : 5'd0;
+    wire [4:0] char_addr_base = (y_blk[1] ? 5'd10 : 5'd0) + ((y_blk[1] & y_blk[0]) ? 5'd10 : 5'd0);
+    wire [4:0] char_addr = frame_active ? (char_addr_base + {1'b0, char_x}) : 5'd0;
 
     // Drive character ROM input
     wire [6:0] char_index;
