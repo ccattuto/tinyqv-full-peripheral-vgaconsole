@@ -19,7 +19,7 @@ Peripheral index: nn
 
 ## What it does
 
-The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as a filled block. The peripheral triggers the user interrupt once per frame refresh. The console text is uninitialited at reset.
+The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). It generates a VGA signal (1024x768 at 60Hz) suitable for a [TinyVGA PMOD](https://github.com/mole99/tiny-vga). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as a filled block. The peripheral triggers the user interrupt once per frame refresh. The console text is uninitialited at reset.
 
 ## Register map
 
