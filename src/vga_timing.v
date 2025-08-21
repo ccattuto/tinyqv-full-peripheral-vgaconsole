@@ -61,10 +61,8 @@ always @(posedge clk) begin
         end
 
         hsync <= !({x_hi, x_lo} >= `H_SYNC && {x_hi, x_lo} < `H_BPORCH);
-        //hsync <= ~hsync_region;
         
         vsync <= ({y_hi, y_lo} >= `V_SYNC && {y_hi, y_lo} < `V_BPORCH);
-        //vsync <= (y_hi == 5'd16) & (y_lo >= 6'd3) & (y_lo < 6'd7);
 
         //if (cli || {y_hi, y_lo} == 0) begin
         if (cli || ~((|y_hi) | (|y_lo))) begin
@@ -72,15 +70,6 @@ always @(posedge clk) begin
         end
     end
 end
-
-// wire xlo_ge_16 = x_lo[4];
-// wire xlo_lt_24 = ~(x_lo[4] & x_lo[3]);
-
-// wire hsync_region =
-//     ((x_hi == 6'd33) &  xlo_ge_16) |
-//     (x_hi == 6'd34)                |
-//     (x_hi == 6'd35)                |
-//     ((x_hi == 6'd36) &  xlo_lt_24);
 
 // assign blank = ({x_hi, x_lo} >= `H_FPORCH || {y_hi, y_lo} >= `V_FPORCH);
 assign blank = x_hi[5] | y_hi[4];
