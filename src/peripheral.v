@@ -31,9 +31,9 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    localparam [1:0] NUM_ROWS = 3;
-    localparam [3:0] NUM_COLS = 10;
-    localparam [5:0] NUM_CHARS = NUM_ROWS * NUM_COLS;
+    localparam NUM_ROWS = 3;
+    localparam NUM_COLS = 10;
+    localparam NUM_CHARS = NUM_ROWS * NUM_COLS;
     localparam ROWS_ADDR_WIDTH = $clog2(NUM_ROWS);
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
@@ -170,7 +170,8 @@ module tqvp_example (
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
     wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
-    wire [6:0] char_index = text[char_addr];
+    wire [4:0] char_addr_safe = (char_addr < NUM_CHARS) ? char_addr : 5'd0;
+    wire [6:0] char_index = text[char_addr_safe];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
@@ -180,7 +181,8 @@ module tqvp_example (
 
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
-    wire char_pixel = (&rel_y || rel_x_5) ? 1'b0 : char_data[offset];
+    wire padding = (&rel_y) || rel_x_5;
+    wire char_pixel = (~padding) & char_data[padding ? 6'd0 : offset];
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
@@ -188,11 +190,7 @@ module tqvp_example (
     always @(posedge clk) begin
         vsync_buf <= vsync;
         hsync_buf <= hsync;
-        if (blank) begin
-            {B, G, R} <= 6'b000000;
-        end else begin
-            {B, G, R} <= pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color;
-        end
+        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color);
     end
 
     // ----- CHARACTER ROM -----

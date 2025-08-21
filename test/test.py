@@ -73,12 +73,6 @@ async def test_project(dut):
     for (i, ch) in enumerate("PERIPHERAL"):
         await tqv.write_byte_reg(20+i, ord(ch))
 
-    # await tqv.write_byte_reg(0, ord('C'))
-    # await tqv.write_byte_reg(1, ord('I'))
-    # await tqv.write_byte_reg(2, ord('R'))
-    # await tqv.write_byte_reg(3, ord('O'))
-    # await tqv.write_byte_reg(4, ord('!'))
-
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
     #imageio.imwrite("vga_grab1.png", vgaframe * 64)
