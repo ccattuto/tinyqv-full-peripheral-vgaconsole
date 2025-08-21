@@ -55,8 +55,6 @@ module tqvp_example (
 
     // Register reads
     assign data_out = 32'h0;
-    // assign data_out = &address ? {30'h0, vsync, blank}  // REG_VGA
-    //                 : 32'h0;
 
     // clear interrupt on reading REG_VGA
     assign clear_interrupt = &address & ~&data_read_n;
@@ -76,7 +74,7 @@ module tqvp_example (
     localparam [10:0] VGA_FRAME_XMIN = 32;
     localparam [10:0] VGA_FRAME_XMAX = VGA_WIDTH - 32;
     localparam [10:0] VGA_FRAME_YMIN = 128;
-    localparam [10:0] VGA_FRAME_YMAX = VGA_FRAME_YMIN + 128 * NUM_ROWS; // 128 pixels per character row
+    localparam [10:0] VGA_FRAME_YMAX = VGA_FRAME_YMIN + 128 * NUM_ROWS;  // 128 pixels per character row
 
     // VGA signals
     wire hsync;
@@ -145,11 +143,11 @@ module tqvp_example (
     end
 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [3:0] char_y = y_blk - 4'd1;
+    wire [1:0] char_y = y_blk[1:0] - 2'd1;
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-    wire [4:0] char_addr = ({3'd0, char_y[1:0]} << 3) + ({3'd0, char_y[1:0]} << 1) + char_x;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
+    wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
 
     wire [6:0] char_index;
     wire [1:0] char_color_index;
