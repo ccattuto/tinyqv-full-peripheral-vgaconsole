@@ -141,7 +141,7 @@ module tqvp_example (
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-    wire [3:0] char_x_safe = frame_active ? char_x : 4'd0;
+    wire [3:0] char_x_safe = {frame_active ? char_x[3] : 1'b0, char_x[2:0]};
     wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x_safe;  // we hardcode NUM_COLS = 10, NUM_ROWS=2 to save gates
 
     wire [6:0] char_index;
@@ -157,7 +157,7 @@ module tqvp_example (
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
     wire padding = &rel_y || rel_x_5;
-    wire char_pixel = padding ? 1'b0 : char_data[padding ? 6'd0 : offset];
+    wire char_pixel = padding ? 1'b0 : char_data[{padding ? 1'b0 : offset[5], offset[4:0]}];
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
