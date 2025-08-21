@@ -31,9 +31,9 @@ module tqvp_example (
     output        user_interrupt  // Dedicated interrupt request for this peripheral
 );
 
-    localparam NUM_ROWS = 3;
-    localparam NUM_COLS = 10;
-    localparam NUM_CHARS = NUM_ROWS * NUM_COLS;
+    localparam [1:0] NUM_ROWS = 3;
+    localparam [3:0] NUM_COLS = 10;
+    localparam [5:0] NUM_CHARS = NUM_ROWS * NUM_COLS;
     localparam ROWS_ADDR_WIDTH = $clog2(NUM_ROWS);
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
@@ -92,12 +92,12 @@ module tqvp_example (
 
     // ----- VGA INTERFACE -----
 
-    localparam VGA_WIDTH = 1024;
-    localparam VGA_HEIGHT = 768;
-    localparam VGA_FRAME_XMIN = 32;
-    localparam VGA_FRAME_XMAX = VGA_WIDTH - 32;
-    localparam VGA_FRAME_YMIN = 192;
-    localparam VGA_FRAME_YMAX = VGA_HEIGHT - 192;
+    localparam [10:0] VGA_WIDTH = 1024;
+    localparam [10:0] VGA_HEIGHT = 768;
+    localparam [10:0] VGA_FRAME_XMIN = 32;
+    localparam [10:0] VGA_FRAME_XMAX = VGA_WIDTH - 32;
+    localparam [10:0] VGA_FRAME_YMIN = 128;
+    localparam [10:0] VGA_FRAME_YMAX = VGA_FRAME_YMIN + 128 * NUM_ROWS;  // 128 pixels per character row
 
     // VGA signals
     wire hsync;
@@ -130,12 +130,15 @@ module tqvp_example (
         .y_hi(y_hi)
     );
 
-    wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
-                            pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX) ? 1 : 0;
+    wire valid_x = (|pix_x[10:5]) & (~&pix_x[9:5]);
+    wire [3:0] y_blk = pix_y[10:7];
+    wire valid_y = ~y_blk[3] & ~y_blk[2] & (y_blk[1] | y_blk[0]);
+    wire frame_active = valid_x & valid_y;
+    //wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
+    //                        pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX);
 
     // (x,y) coordinates relative to frame
     assign pix_y = ({6'b0, y_hi} << 5) + ({6'b0, y_hi} << 4) + {5'b0, y_lo};  // pix_y = y_hi * 48 + y_lo
-    wire [10:0] pix_y_frame = pix_y - VGA_FRAME_YMIN;
 
     // Character pixels are 16x16 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
@@ -145,9 +148,10 @@ module tqvp_example (
     reg [COLS_ADDR_WIDTH-1:0] char_x;
     wire [2:0] rel_x = cx96[6:4];
     wire rel_x_5 = (rel_x == 3'd5);
+    wire x_at_reset = (~|pix_x[10:5]) & (&pix_x[4:0]);  // x == VGA_FRAME_XMIN - 1
 
     always @(posedge clk) begin
-        if (pix_x == VGA_FRAME_XMIN - 1) begin  // pix_x == VGA_FRAME_XMIN - 1
+        if (x_at_reset) begin
             cx96 <= 0;
             char_x <= 0;
         end else begin
@@ -161,15 +165,15 @@ module tqvp_example (
     end
 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [ROWS_ADDR_WIDTH-1:0] char_y = pix_y_frame[8:7];  // divide by 128 (VGA char height is 128 pixels)
+    wire [1:0] char_y = y_blk[1:0] - 2'd1;
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
-    wire [4:0] char_addr = ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 3) + ({{(5-ROWS_ADDR_WIDTH){1'b0}}, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
+    wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
     wire [6:0] char_index = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
-    wire [2:0] rel_y = pix_y_frame[6:4];  // remainder of division by 8
+    wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
 
     // Character pixel index in the 35-bit wide character ROM (rel_y * 5 + rel_x)
     wire [5:0] offset = ({3'b0, rel_y} << 2) + {3'b0, rel_y} + {3'b0, rel_x};
@@ -181,19 +185,13 @@ module tqvp_example (
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        vsync_buf <= vsync;
+        hsync_buf <= hsync;
+        if (blank) begin
             {B, G, R} <= 6'b000000;
-            vsync_buf <= 0;
-            hsync_buf <= 0;
         end else begin
-            vsync_buf <= vsync;
-            hsync_buf <= hsync;
-            if (blank) begin
-                {B, G, R} <= 6'b000000;
-            end else begin
-                {B, G, R} <= pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color;
-            end
+            {B, G, R} <= pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color;
         end
     end
 

@@ -67,6 +67,7 @@ always @(posedge clk) begin
     end
 end
 
-assign blank = ({x_hi, x_lo} >= `H_FPORCH || {y_hi, y_lo} >= `V_FPORCH);
+//assign blank = ({x_hi, x_lo} >= `H_FPORCH || {y_hi, y_lo} >= `V_FPORCH);
+assign blank = x_hi[5] | y_hi[4];
 
 endmodule
