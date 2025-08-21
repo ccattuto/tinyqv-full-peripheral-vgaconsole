@@ -82,12 +82,14 @@ module tqvp_example (
     wire hsync;
     wire vsync;
     wire blank;
+    reg hsync_buf;
+    reg vsync_buf;
     reg [1:0] R;
     reg [1:0] G;
     reg [1:0] B;
 
     // TinyVGA PMOD
-    assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
+    assign uo_out = {hsync_buf, B[0], G[0], R[0], vsync_buf, B[1], G[1], R[1]};
 
     vga_timing hvsync_gen (
         .clk(clk),
@@ -176,6 +178,8 @@ module tqvp_example (
                                 {2{char_color_index[0]}} };
 
     always @(posedge clk) begin
+        vsync_buf <= vsync;
+        hsync_buf <= hsync;
         {B, G, R} <= (~blank & pixel_on) ? char_color : 6'b000000;
     end
 
