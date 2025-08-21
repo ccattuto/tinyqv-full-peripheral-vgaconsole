@@ -79,7 +79,7 @@ async def test_project(dut):
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    imageio.imwrite("vga_grab1.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 

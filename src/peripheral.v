@@ -55,9 +55,9 @@ module tqvp_example (
     // Writes (only write lowest 8 bits)
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            bg_color <= 6'b010000;
+            bg_color <= 6'b000000;
             text_color1 <= 6'b001100;
-            text_color2 <= 6'b001111;
+            text_color2 <= 6'b000000;
         end else begin
             if (data_write_n != 2'b11) begin
                 if (address < NUM_CHARS) begin
@@ -74,15 +74,10 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
-                      (address == REG_TEXT_COLOR1) ? {26'h0, text_color1} :
-                      (address == REG_TEXT_COLOR2) ? {26'h0, text_color2} :
-                      (address == REG_BG_COLOR) ? {26'h0, bg_color} :
-                      (address == REG_VGA) ? {30'h0, vsync, blank} :
-                      32'h0;
+    assign data_out = (&address) ? {30'h0, vsync, blank} : 32'h0;  // REG_VGA
 
     // VGA status register
-    assign clear_interrupt = (address == REG_VGA) && (data_read_n != 2'b11);
+    assign clear_interrupt = (&address) & (data_read_n != 2'b11);  // REG_VGA
 
     // All reads complete in 1 clock
     assign data_ready = 1;
