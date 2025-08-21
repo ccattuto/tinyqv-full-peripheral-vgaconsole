@@ -38,33 +38,34 @@ module tqvp_example (
     localparam COLS_ADDR_WIDTH = $clog2(NUM_COLS);
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
-    localparam REG_TEXT_COLOR = 6'h30;
-    localparam REG_BG_COLOR = 6'h31;
-    localparam REG_VGA = 6'h32;
+    localparam REG_BG_COLOR     = 6'h30;
+    localparam REG_TEXT_COLOR1  = 6'h31;
+    localparam REG_TEXT_COLOR2  = 6'h32;
+    localparam REG_VGA          = 6'h3F;
 
-    // Text buffer (7-bit chars)
-    reg [6:0] text[0:NUM_CHARS-1];
+    // Text buffer {1 bit color selector, 7-bit ASCII code}
+    reg [7:0] text[0:NUM_CHARS-1];
 
-    reg [5:0] text_color;   // Text color
+    reg [5:0] text_color1;   // Text color 1
+    reg [5:0] text_color2;   // Text color 2
     reg [5:0] bg_color;     // Background color
-    reg transparent;        // Transparency flag
     
-
     // ----- HOST INTERFACE -----
     
     // Writes (only write lowest 8 bits)
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bg_color <= 6'b010000;
-            text_color <= 6'b001100;
-            transparent <= 0;
+            text_color1 <= 6'b001100;
+            text_color2 <= 6'b001111;
         end else begin
             if (data_write_n != 2'b11) begin
                 if (address < NUM_CHARS) begin
-                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[6:0];
-                end else if (address == REG_TEXT_COLOR) begin
-                    text_color <= data_in[5:0];
-                    transparent <= data_in[7];
+                    text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[7:0];
+                end else if (address == REG_TEXT_COLOR1) begin
+                    text_color1 <= data_in[5:0];
+                end else if (address == REG_TEXT_COLOR2) begin
+                    text_color2 <= data_in[5:0];
                 end else if (address == REG_BG_COLOR) begin
                     bg_color <= data_in[5:0];
                 end
@@ -74,7 +75,8 @@ module tqvp_example (
 
     // Register reads
     assign data_out = (address < NUM_CHARS) ? {25'h0, text[address[CHARS_ADDR_WIDTH-1:0]]} : 
-                      (address == REG_TEXT_COLOR) ? {24'h0, transparent, 1'b0, text_color} :
+                      (address == REG_TEXT_COLOR1) ? {26'h0, text_color1} :
+                      (address == REG_TEXT_COLOR2) ? {26'h0, text_color2} :
                       (address == REG_BG_COLOR) ? {26'h0, bg_color} :
                       (address == REG_VGA) ? {30'h0, vsync, blank} :
                       32'h0;
@@ -130,16 +132,15 @@ module tqvp_example (
         .y_hi(y_hi)
     );
 
-    wire valid_x = (|pix_x[10:5]) & (~&pix_x[9:5]);
+    assign pix_y = ({6'b0, y_hi} << 5) + ({6'b0, y_hi} << 4) + {5'b0, y_lo};  // pix_y = y_hi * 48 + y_lo
     wire [3:0] y_blk = pix_y[10:7];
-    wire valid_y = ~y_blk[3] & ~y_blk[2] & (y_blk[1] | y_blk[0]);
-    wire frame_active = valid_x & valid_y;
+
     //wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
     //                        pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX);
-
-    // (x,y) coordinates relative to frame
-    assign pix_y = ({6'b0, y_hi} << 5) + ({6'b0, y_hi} << 4) + {5'b0, y_lo};  // pix_y = y_hi * 48 + y_lo
-
+    wire valid_x = (|pix_x[10:5]) & (~&pix_x[9:5]);
+    wire valid_y = ~y_blk[3] & ~y_blk[2] & (y_blk[1] | y_blk[0]);
+    wire frame_active = valid_x & valid_y;
+  
     // Character pixels are 16x16 squares in the VGA frame.
     // Character glyphs are 5x7 and padded in a 6x8 character box.
 
@@ -171,7 +172,9 @@ module tqvp_example (
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
     wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
     wire [4:0] char_addr_safe = (char_addr < NUM_CHARS) ? char_addr : 5'd0;
-    wire [6:0] char_index = text[char_addr_safe];
+    wire color_sel;
+    wire [6:0] char_index;
+    assign {color_sel, char_index} = text[char_addr_safe];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
@@ -190,7 +193,7 @@ module tqvp_example (
     always @(posedge clk) begin
         vsync_buf <= vsync;
         hsync_buf <= hsync;
-        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? (~transparent ? text_color : text_color | bg_color) : bg_color);
+        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? (color_sel ? text_color2 : text_color1) : bg_color);
     end
 
     // ----- CHARACTER ROM -----

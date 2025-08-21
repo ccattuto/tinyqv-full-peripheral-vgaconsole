@@ -64,14 +64,18 @@ async def test_project(dut):
     # clear console (all spaces)
     for i in range(30):
         await tqv.write_word_reg(i, 32)
+
+    await tqv.write_byte_reg(0x30, 0b010000)
+    await tqv.write_byte_reg(0x31, 0b001100)
+    await tqv.write_byte_reg(0x32, 0b110011)
     
     # write text
     for (i, ch) in enumerate("VGA"):
         await tqv.write_byte_reg(0+i, ord(ch))
     for (i, ch) in enumerate("CONSOLE"):
-        await tqv.write_byte_reg(10+i, ord(ch))
+        await tqv.write_byte_reg(10+i, 0x80 | ord(ch))
     for (i, ch) in enumerate("PERIPHERAL"):
-        await tqv.write_byte_reg(20+i, ord(ch))
+        await tqv.write_byte_reg(20+i, ((i & 1) << 7) | ord(ch))
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
