@@ -50,8 +50,9 @@ async def test_project(dut):
         await tqv.write_word_reg(i, 32)
 
     await tqv.write_byte_reg(0x30, 0b010000)
-    await tqv.write_byte_reg(0x31, 0b101010)
-    
+    await tqv.write_byte_reg(0x31, 0b001100)
+    await tqv.write_byte_reg(0x32, 0b110011)
+
     # write text
     for (i, ch) in enumerate("VGA"):
         await tqv.write_byte_reg(0+i, ord(ch))
@@ -62,12 +63,13 @@ async def test_project(dut):
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    imageio.imwrite("vga_grab1.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
-    # change text color to transparent teal
-    await tqv.write_byte_reg(0x31, 0b001110)
+    # change text colors to teal & red
+    await tqv.write_byte_reg(0x31, 0b111100)
+    await tqv.write_byte_reg(0x32, 0b000011)
 
     # change background color to black
     await tqv.write_byte_reg(0x30, 0b000000)
@@ -79,7 +81,7 @@ async def test_project(dut):
 
      # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    #imageio.imwrite("vga_grab2.png", vgaframe * 64)
+    imageio.imwrite("vga_grab2.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref2.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
