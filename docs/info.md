@@ -19,7 +19,7 @@ Peripheral index: 0
 
 ## What it does
 
-The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as filled blocks. The peripheral triggers the user interrupt once per frame refresh. The console text is uninitialited at reset.
+The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as filled blocks. The peripheral triggers the user interrupt once per frame refresh, right after the bottom row of text has been displayed. The console text is uninitialited at reset.
 
 ## Register map
 

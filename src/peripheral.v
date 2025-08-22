@@ -53,7 +53,7 @@ module tqvp_example (
     // ----- HOST INTERFACE -----
     
     // Writes (only write lowest 8 bits)
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
             bg_color <= 6'b010000;
             text_color1 <= 6'b001100;
@@ -73,18 +73,27 @@ module tqvp_example (
         end
     end
 
-    // VGA status register
-    assign clear_interrupt = (&address) & (~&data_read_n);  // REG_VGA
-
     // Register reads
     assign data_out = (&address) ? {30'b0, vsync, blank} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
 
-    // Interrupt handling
-    wire vga_interrupt, clear_interrupt;
-    assign user_interrupt = vga_interrupt;
+    // --- Interrupt handling ---
+    reg interrupt;
+    assign user_interrupt = interrupt;
+
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            interrupt <= 0;
+        end else begin
+            if ((&address) & (~&data_read_n)) begin  // read REG_VGA
+                interrupt <= 0;
+            end else if ((~|y_lo) && (y_hi == 5'd12)) begin
+                interrupt <= 1;
+            end
+        end
+    end
 
 
     // ----- VGA INTERFACE -----
@@ -117,8 +126,6 @@ module tqvp_example (
         .hsync(hsync),
         .vsync(vsync),
         .blank(blank),
-        .interrupt(vga_interrupt),
-        .cli(clear_interrupt),
         .x_lo(pix_x[4:0]),
         .x_hi(pix_x[10:5]),
         .y_lo(y_lo),
