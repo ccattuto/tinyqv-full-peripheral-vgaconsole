@@ -77,7 +77,7 @@ module tqvp_example (
     assign clear_interrupt = (&address) & (~&data_read_n);  // REG_VGA
 
     // Register reads
-    assign data_out = 32'h0;
+    assign data_out = (&address) ? {30'b0, vsync, blank} : 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -181,7 +181,6 @@ module tqvp_example (
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
-
     wire [5:0] char_color = color_sel ? text_color2 : text_color1;
 
     always @(posedge clk) begin
