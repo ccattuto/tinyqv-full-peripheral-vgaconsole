@@ -39,15 +39,13 @@ module tqvp_example (
     localparam CHARS_ADDR_WIDTH = $clog2(NUM_CHARS);
 
     localparam REG_BG_COLOR     = 6'h30;
-    localparam REG_TEXT_COLOR1  = 6'h31;
-    localparam REG_TEXT_COLOR2  = 6'h32;
+    localparam REG_TEXT_COLOR   = 6'h31;
     localparam REG_VGA          = 6'h3F;
 
     // Text buffer {1 bit color selector, 7-bit ASCII code}
     reg [7:0] text[0:NUM_CHARS-1];
 
-    reg [5:0] text_color1;  // Text color 1
-    reg [5:0] text_color2;  // Text color 2
+    reg [5:0] text_color;   // Text color (low 3 bits for color 1, high 3 bits for color 2)
     reg [5:0] bg_color;     // Background color
     
     // ----- HOST INTERFACE -----
@@ -56,16 +54,13 @@ module tqvp_example (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bg_color <= 6'b000000;
-            text_color1 <= 6'b001100;
-            text_color2 <= 6'b000000;
+            text_color <= 6'b101010;
         end else begin
             if (~&data_write_n) begin
                 if (address < NUM_CHARS) begin
                     text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[7:0];
-                end else if (address == REG_TEXT_COLOR1) begin
-                    text_color1 <= data_in[5:0];
-                end else if (address == REG_TEXT_COLOR2) begin
-                    text_color2 <= data_in[5:0];
+                end else if (address == REG_TEXT_COLOR) begin
+                    text_color <= data_in[5:0];
                 end else if (address == REG_BG_COLOR) begin
                     bg_color <= data_in[5:0];
                 end
@@ -182,8 +177,11 @@ module tqvp_example (
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
 
+    wire [2:0] char_color_sel = color_sel ? text_color[5:3] : text_color[2:0];
+    wire [5:0] char_color = {{2{char_color_sel[2]}}, {2{char_color_sel[1]}}, {2{char_color_sel[0]}}};
+
     always @(posedge clk) begin
-        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? (color_sel ? text_color2 : text_color1) : bg_color);
+        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? char_color : bg_color);
     end
 
     // ----- CHARACTER ROM -----

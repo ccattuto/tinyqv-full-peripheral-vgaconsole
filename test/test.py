@@ -50,8 +50,7 @@ async def test_project(dut):
         await tqv.write_word_reg(i, 32)
 
     await tqv.write_byte_reg(0x30, 0b010000)
-    await tqv.write_byte_reg(0x31, 0b001100)
-    await tqv.write_byte_reg(0x32, 0b110011)
+    await tqv.write_byte_reg(0x31, 0b101010)
     
     # write text
     for (i, ch) in enumerate("VGA"):
@@ -68,14 +67,14 @@ async def test_project(dut):
     assert np.all(vgaframe == vgaframe_ref)
 
     # change text color to transparent teal
-    await tqv.write_byte_reg(0x30, 0x80 | 0b111100)
+    await tqv.write_byte_reg(0x31, 0b001110)
 
-    # change background color to red
-    await tqv.write_byte_reg(0x32, 0b000011)
+    # change background color to black
+    await tqv.write_byte_reg(0x30, 0b000000)
 
     # write non-printable ASCII characters in top-right corner
-    await tqv.write_byte_reg(9, 0)
     await tqv.write_byte_reg(8, 31)
+    await tqv.write_byte_reg(9, 0x80 | 0)
     await tqv.write_byte_reg(10+9, 13)
 
      # grab next VGA frame and compare with reference image
