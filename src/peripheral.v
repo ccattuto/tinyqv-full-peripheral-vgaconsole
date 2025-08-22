@@ -46,8 +46,8 @@ module tqvp_example (
     // Text buffer {1 bit color selector, 7-bit ASCII code}
     reg [7:0] text[0:NUM_CHARS-1];
 
-    reg [5:0] text_color1;   // Text color 1
-    reg [5:0] text_color2;   // Text color 2
+    reg [5:0] text_color1;  // Text color 1
+    reg [5:0] text_color2;  // Text color 2
     reg [5:0] bg_color;     // Background color
     
     // ----- HOST INTERFACE -----
@@ -75,6 +75,9 @@ module tqvp_example (
 
     // VGA status register
     assign clear_interrupt = (&address) & (~&data_read_n);  // REG_VGA
+
+    // Register reads
+    assign data_out = 32'h0;
 
     // All reads complete in 1 clock
     assign data_ready = 1;

@@ -63,17 +63,15 @@ async def test_project(dut):
 
     # grab next VGA frame and compare with reference image
     vgaframe = await grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0)
-    imageio.imwrite("vga_grab1.png", vgaframe * 64)
+    #imageio.imwrite("vga_grab1.png", vgaframe * 64)
     vgaframe_ref = imageio.imread("vga_ref1.png") / 64
     assert np.all(vgaframe == vgaframe_ref)
 
     # change text color to transparent teal
     await tqv.write_byte_reg(0x30, 0x80 | 0b111100)
-    assert await tqv.read_byte_reg(0x30) ==  0x80 | 0b111100
 
     # change background color to red
-    await tqv.write_byte_reg(0x31, 0b000011)
-    assert await tqv.read_byte_reg(0x31) == 0b000011
+    await tqv.write_byte_reg(0x32, 0b000011)
 
     # write non-printable ASCII characters in top-right corner
     await tqv.write_byte_reg(9, 0)
