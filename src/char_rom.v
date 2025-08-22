@@ -9,7 +9,6 @@ module char_rom #(
 );
 
 reg [DATA_WIDTH-1:0] mem [0:ADDR_MAX-ADDR_MIN];
-
 initial begin
     $readmemb("font.bin", mem);  // load char bitmaps from file
 end
@@ -20,7 +19,7 @@ initial begin
 end
 
 wire [ADDR_WIDTH-1:0] phys;
-assign phys = |address[ADDR_WIDTH-1:5] ? row_lut_inv[address-ADDR_MIN] : 7'd95;
+assign phys = (|address[ADDR_WIDTH-1:5]) ? row_lut_inv[address-ADDR_MIN] : 7'd95;
 
 assign data = mem[phys];
 

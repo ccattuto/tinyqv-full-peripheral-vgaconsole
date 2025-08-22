@@ -15,7 +15,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 Author: Ciro Cattuto
 
-Peripheral index: 13
+Peripheral index: 0
 
 ## What it does
 

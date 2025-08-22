@@ -130,7 +130,7 @@ module tqvp_example (
 
     //wire frame_active = ( pix_x >= VGA_FRAME_XMIN && pix_x < VGA_FRAME_XMAX &&
     //                        pix_y >= VGA_FRAME_YMIN && pix_y < VGA_FRAME_YMAX);
-    wire valid_x = (|pix_x[10:5]) & (~&pix_x[9:5]);
+    wire valid_x = ~pix_x[10] & (|pix_x[9:5]) & ~(&pix_x[9:5]);
     wire valid_y = ~y_blk[3] & ~y_blk[2] & (y_blk[1] | y_blk[0]);
     wire frame_active = valid_x & valid_y;
   
@@ -177,7 +177,7 @@ module tqvp_example (
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
     wire padding = (&rel_y) || rel_x_5;
-    wire char_pixel = (~padding) & char_data[padding ? 6'd0 : offset];
+    wire char_pixel = (~padding) & char_data[frame_active ? offset : 6'd0];
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
