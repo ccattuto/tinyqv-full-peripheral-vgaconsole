@@ -45,22 +45,6 @@ async def test_project(dut):
 
     dut._log.info("Test project behavior")
 
-    # test register write and read back
-    dut._log.info("Write/read registers")
-    random.seed(42)
-
-    # byte writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_byte_reg(i, val)
-        await tqv.read_byte_reg(i) == val
-
-    # word writes/reads
-    for i in range(30):
-        val = random.randint(0,127)
-        await tqv.write_word_reg(i, val)
-        await tqv.read_word_reg(i) == val
-
     # clear console (all spaces)
     for i in range(30):
         await tqv.write_word_reg(i, 32)
@@ -124,7 +108,7 @@ async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
         if ypos < 27:
             continue
 
-        await Timer(15625 * 151, units="ps")
+        await Timer(15625 * 152, units="ps")
         for xpos in range(1024):
             await Timer(15626 / 2 , units="ps")
             vga_frame[ypos-27][xpos][0] = R1.value << 1 | R0.value

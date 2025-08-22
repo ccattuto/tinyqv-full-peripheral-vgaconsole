@@ -59,7 +59,7 @@ module tqvp_example (
             text_color1 <= 6'b001100;
             text_color2 <= 6'b000000;
         end else begin
-            if (data_write_n != 2'b11) begin
+            if (~&data_write_n) begin
                 if (address < NUM_CHARS) begin
                     text[address[CHARS_ADDR_WIDTH-1:0]] <= data_in[7:0];
                 end else if (address == REG_TEXT_COLOR1) begin
@@ -73,11 +73,8 @@ module tqvp_example (
         end
     end
 
-    // Register reads
-    assign data_out = (&address) ? {30'h0, vsync, blank} : 32'h0;  // REG_VGA
-
     // VGA status register
-    assign clear_interrupt = (&address) & (data_read_n != 2'b11);  // REG_VGA
+    assign clear_interrupt = (&address) & (~&data_read_n);  // REG_VGA
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -99,8 +96,6 @@ module tqvp_example (
     // VGA signals
     wire hsync;
     wire vsync;
-    reg hsync_buf;
-    reg vsync_buf;
     wire blank;
     reg [1:0] R;
     reg [1:0] G;
@@ -111,7 +106,7 @@ module tqvp_example (
     wire [4:0] y_hi;
 
     // TinyVGA PMOD
-    assign uo_out = {hsync_buf, B[0], G[0], R[0], vsync_buf, B[1], G[1], R[1]};
+    assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
     vga_timing hvsync_gen (
         .clk(clk),
@@ -161,15 +156,14 @@ module tqvp_example (
     end
 
     // (x,y) character coordinates in NUM_ROWS x NUM_COLS text buffer
-    wire [1:0] char_y = y_blk[1:0] - 2'd1;
+    wire [1:0] char_y = frame_active ? (y_blk[1:0] - 2'd1) : 2'd0;
 
     // Drive character ROM input
     //wire [6:0] char_index = text[char_y * NUM_COLS + char_x];
     wire [4:0] char_addr = ({3'd0, char_y} << 3) + ({3'd0, char_y} << 1) + char_x;  // we hardcode NUM_COLS = 10 to save gates
-    wire [4:0] char_addr_safe = (char_addr < NUM_CHARS) ? char_addr : 5'd0;
     wire color_sel;
     wire [6:0] char_index;
-    assign {color_sel, char_index} = text[char_addr_safe];
+    assign {color_sel, char_index} = text[char_addr];
 
     // Character pixel coordinates relative to the 5x7 glyph padded in a 6x8 character box
     wire [2:0] rel_y = pix_y[6:4];  // remainder of division by 16
@@ -186,8 +180,6 @@ module tqvp_example (
     wire pixel_on = frame_active & char_pixel;
 
     always @(posedge clk) begin
-        vsync_buf <= vsync;
-        hsync_buf <= hsync;
         {B, G, R} <= blank ? 6'b000000 : (pixel_on ? (color_sel ? text_color2 : text_color1) : bg_color);
     end
 
