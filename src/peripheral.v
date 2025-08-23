@@ -74,7 +74,7 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (&address) ? {30'b0, vsync, blank} : 32'h0;
+    assign data_out = (&address) ? {30'b0, vsync, blank} : 32'h0;  // REG_VGA
 
     // All reads complete in 1 clock
     assign data_ready = 1;

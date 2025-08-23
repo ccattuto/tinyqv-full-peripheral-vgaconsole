@@ -19,11 +19,11 @@ Peripheral index: 0
 
 ## What it does
 
-The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as filled blocks. The peripheral triggers the user interrupt once per frame refresh, right after the bottom row of text has been displayed. The console text is uninitialited at reset.
+The peripheral provides a 10x3 character VGA console supporting printable ASCII characters (32-126). It generates a 1024x768 60Hz VGA signal (63.5 MHz pixel clock, rounded to 64 MHz) suitable for a [TinyVGA PMOD](https://github.com/mole99/tiny-vga). The 10x3 text buffer is memory-mapped, hence it is possible to set individual characters using simple writes to the peripheral's registers. Non-printable ASCII codes are displayed as filled blocks. The peripheral triggers the user interrupt once per frame refresh, after the bottom line of the screen has been painted. The console text is uninitialited at reset.
 
 ## Register map
 
-- The 10x3 character buffer is exposed via registers `CHAR0` to `CHAR29`. When writing to these registers, the lowest 7 bits of the written value contain the printable ASCII code, bit 7 controls the color of the character (0=color1, 1=color2).
+- The 10x3 character buffer is exposed via registers `CHAR0` to `CHAR29`. When writing to these registers, the low 7 bits of the written value contain the printable ASCII code, bit 7 controls the color of the character (0=color1, 1=color2).
 - Writing to `TXTCOL1` sets text color 1 (6 bits, 2 bits per channel, BBGGRR order). The default color is green (001100).
 - Writing to `TXTCOL2` sets text color 2 (6 bits, 2 bits per channel, BBGGRR order). The default color is magenta (110011).
 - Writing to `BGCOL` sets the background color (6 bits, 2 bits per channel, BBGGRR order). The default color is dark blue (010000).
@@ -41,7 +41,7 @@ The peripheral provides a 10x3 character VGA console supporting printable ASCII 
 | 0x30    | TXTCOL1 | W      | Text color 1: xxBBGGRR (default 001100, green)                      |
 | 0x31    | TXTCOL2 | W      | Text color 2: xxBBGGRR (default 110011, magenta)                    |
 | 0x32    | BGCOL   | W      | Background color: xxBBGGRR (default 010000, dark blue)              |
-| 0x3F    | VGA     | R      | VGA status: blank (bit 0), vsync (bit 1)                            |
+| 0x3F    | VGA     | R      | VGA status: blank (bit 0), vsync (bit 1). Clears interrupt on read. |
 
 ## How to test
 
