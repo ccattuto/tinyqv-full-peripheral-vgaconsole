@@ -8,6 +8,11 @@ module char_rom #(
     output wire [DATA_WIDTH-1:0] data
 );
 
+// The ROM has been optimized for gate count. The 96 printable ASCII characters
+// have been remapped to minimize logic complexity. The mapping is inverted
+// by the LUT below. The space taken by the remapped ROM and the LUT is smaller
+// than the space taken by the original ROM.
+
 reg [DATA_WIDTH-1:0] mem [0:ADDR_MAX-ADDR_MIN];
 initial begin
     $readmemb("font.bin", mem);  // load char bitmaps from file

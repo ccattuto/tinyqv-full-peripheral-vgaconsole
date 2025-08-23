@@ -86,6 +86,7 @@ async def test_project(dut):
     assert np.all(vgaframe == vgaframe_ref)
 
     # check interrupt behavior
+    dut._log.info("Test interrupt behavior")
     assert await tqv.is_interrupt_asserted() == True
     vga_status = await tqv.read_byte_reg(0x3F)  # read VGA register to clear interrupt
     assert vga_status & 0x01 != 0
