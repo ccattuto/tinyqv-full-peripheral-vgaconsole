@@ -184,7 +184,7 @@ module tqvp_example (
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
     wire padding = (&rel_y) || rel_x_5;
-    wire char_pixel = (~padding) & char_data[frame_active ? offset : 6'd0];
+    wire char_pixel = (~padding) & char_data[(frame_active & ~padding) ? offset : 6'd0];
 
     // Generate RGB signals
     wire pixel_on = frame_active & char_pixel;
