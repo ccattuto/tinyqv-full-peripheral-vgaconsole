@@ -74,7 +74,7 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (&address) ? {30'b0, vsync, blank} : 32'h0;  // REG_VGA
+    assign data_out = (&address) ? {29'b0, hsync, vsync, interrupt} : 32'h0;  // REG_VGA
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -87,10 +87,10 @@ module tqvp_example (
         if (!rst_n) begin
             interrupt <= 0;
         end else begin
-            if ((&address) & (~&data_read_n)) begin  // read REG_VGA
-                interrupt <= 0;
-            end else if ((~|y_lo) & (~|y_hi)) begin
+            if ((~|y_lo) & (~|y_hi)) begin
                 interrupt <= 1;
+            end else if ((&address) & (~&data_read_n)) begin  // read REG_VGA
+                interrupt <= 0;
             end
         end
     end

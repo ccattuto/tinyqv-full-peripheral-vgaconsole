@@ -87,8 +87,11 @@ async def test_project(dut):
 
     # check interrupt behavior
     assert await tqv.is_interrupt_asserted() == True
-    await tqv.read_byte_reg(0x3F)  # read VGA register to clear interrupt
+    vga_status = await tqv.read_byte_reg(0x3F)  # read VGA register to clear interrupt
+    assert vga_status & 0x01 != 0
     assert await tqv.is_interrupt_asserted() == False
+    vga_status = await tqv.read_byte_reg(0x3F)
+    assert vga_status & 0x01 == 0
 
 
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
