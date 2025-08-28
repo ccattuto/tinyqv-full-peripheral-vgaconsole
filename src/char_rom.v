@@ -4,8 +4,9 @@ module char_rom #(
     parameter ADDR_MIN = 32,
     parameter ADDR_MAX = 127
 )(
+    input wire clk,
     input wire [ADDR_WIDTH-1:0] address,
-    output wire [DATA_WIDTH-1:0] data
+    output reg [DATA_WIDTH-1:0] data
 );
 
 // The ROM has been optimized for gate count. The 96 printable ASCII characters
@@ -26,6 +27,8 @@ end
 wire [ADDR_WIDTH-1:0] phys;
 assign phys = (|address[ADDR_WIDTH-1:5]) ? row_lut_inv[address-ADDR_MIN] : 7'd95;
 
-assign data = mem[phys];
+always @(posedge clk) begin
+    data <= mem[phys];
+end
 
 endmodule

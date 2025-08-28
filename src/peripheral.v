@@ -74,7 +74,7 @@ module tqvp_example (
     end
 
     // Register reads
-    assign data_out = (&address) ? {29'b0, hsync, vsync, interrupt} : 32'h0;  // REG_VGA
+    assign data_out = (&address) ? {29'b0, hsync_d, vsync_d, interrupt} : 32'h0;  // REG_VGA
 
     // All reads complete in 1 clock
     assign data_ready = 1;
@@ -118,7 +118,7 @@ module tqvp_example (
     wire [4:0] y_hi;
 
     // TinyVGA PMOD
-    assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
+    assign uo_out = {hsync_d, B[0], G[0], R[0], vsync_d, B[1], G[1], R[1]};
 
     vga_timing hvsync_gen (
         .clk(clk),
@@ -184,14 +184,14 @@ module tqvp_example (
     // Look up character pixel value in character ROM,
     // handling 1-pixel padding along x and y directions.
     wire padding = (&rel_y) || rel_x_5;
-    wire char_pixel = (~padding) & char_data[(frame_active & ~padding) ? offset : 6'd0];
+    wire char_pixel = (~padding_d) & char_data[(frame_active_d & ~padding_d) ? offset_d : 6'd0];
 
     // Generate RGB signals
-    wire pixel_on = frame_active & char_pixel;
-    wire [5:0] char_color = color_sel ? text_color2 : text_color1;
+    wire pixel_on = frame_active_d & char_pixel;
+    wire [5:0] char_color = color_sel_d ? text_color2 : text_color1;
 
     always @(posedge clk) begin
-        {B, G, R} <= blank ? 6'b000000 : (pixel_on ? char_color : bg_color);
+        {B, G, R} <= blank_d ? 6'b000000 : (pixel_on ? char_color : bg_color);
     end
 
     // ----- CHARACTER ROM -----
@@ -199,8 +199,25 @@ module tqvp_example (
     wire [34:0] char_data;
 
     char_rom char_rom_inst (
+        .clk(clk),
         .address(char_index),
         .data(char_data) 
     );
+
+    reg [5:0] offset_d;
+    reg padding_d;
+    reg frame_active_d;
+    reg color_sel_d;
+    reg hsync_d, vsync_d, blank_d;
+
+    always @(posedge clk) begin
+        offset_d       <= offset;
+        padding_d      <= padding;
+        frame_active_d <= frame_active;
+        color_sel_d    <= color_sel;
+        hsync_d        <= hsync;
+        vsync_d        <= vsync;
+        blank_d        <= blank;
+    end
 
 endmodule
