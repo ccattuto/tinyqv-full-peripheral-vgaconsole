@@ -3,7 +3,7 @@
 
 import cocotb
 from cocotb.clock import Clock, Timer
-from cocotb.triggers import Edge, ClockCycles
+from cocotb.triggers import Edge, ClockCycles, RisingEdge, FallingEdge, ReadOnly
 import numpy as np
 import imageio.v2 as imageio
 import random
@@ -95,34 +95,58 @@ async def test_project(dut):
     assert vga_status & 0x01 == 0
 
 
-async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0):
-    vga_frame = np.zeros((768, 1024, 3), dtype=np.uint8)
+# Grab one VGA frame from the DUT.
+# Returns a (height, width, 3) numpy array with 2-bit RGB values.
+# Default: 1024x768 @ 60Hz timing with 22 line vertical back porch
+# and 152 pixel horizontal back porch.
+# NOTICE: it assumes that the pixel clock is the same as the system clock.
+async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0,
+                   width=1024, height=768, v_back_porch_lines=22, h_back_porch_pixels=152):
+    vga_frame = np.zeros((height, width, 3), dtype=np.uint8)
 
+    # sync to the end of the vsync pulse
     dut._log.info("grab VGA frame: wait for vsync")
-    #while vsync.value == 0:
-    #    await Edge(dut.uo_out)
-    while vsync.value == 1:
+    while vsync.value.integer == 0:
         await Edge(dut.uo_out)
-    while vsync.value == 0:  # wait for vsync pulse to finish
+    while vsync.value.integer == 1:  # wait for vsync pulse to finish
         await Edge(dut.uo_out)
     dut._log.info("grab VGA frame: start")
 
-    for ypos in range(27+768):
-        while hsync.value == 1:
-            await Edge(dut.uo_out)
-        while hsync.value == 0:
+    # if hsync is low, clear this pulse
+    if hsync.value.integer == 0:
+        while hsync.value.integer == 0:
             await Edge(dut.uo_out)
 
-        if ypos < 27:
-            continue
+    # skip v_back_porch_lines
+    for _ in range(v_back_porch_lines):
+        while hsync.value.integer == 1:
+            await Edge(dut.uo_out)
+        while hsync.value.integer == 0:
+            await Edge(dut.uo_out)
 
-        await Timer(15625 * 152, units="ps")
-        for xpos in range(1024):
-            await Timer(15626 / 2 , units="ps")
-            vga_frame[ypos-27][xpos][0] = R1.value << 1 | R0.value
-            vga_frame[ypos-27][xpos][1] = G1.value << 1 | G0.value
-            vga_frame[ypos-27][xpos][2] = B1.value << 1 | B0.value
-            await Timer(15626 / 2, units="ps")
+    # grab lines
+    for ypos in range(height):
+        # sync to end of hsync pulse
+        while hsync.value.integer == 1:
+            await Edge(dut.uo_out)
+        while hsync.value.integer == 0:
+            await Edge(dut.uo_out)
+
+        # skip h_back_porch_pixels
+        await ClockCycles(dut.clk, h_back_porch_pixels)
+
+        # sync to falling edge of clk to sample mid-pixel
+        await FallingEdge(dut.clk)
+
+        # grab pixels
+        for xpos in range(width):
+            vga_frame[ypos][xpos][0] = (R1.value.integer << 1) | R0.value.integer
+            vga_frame[ypos][xpos][1] = (G1.value.integer << 1) | G0.value.integer
+            vga_frame[ypos][xpos][2] = (B1.value.integer << 1) | B0.value.integer
+
+            # wait 1 clock cycle for next pixel
+            await RisingEdge(dut.clk)
+            await FallingEdge(dut.clk)
 
     dut._log.info("grab VGA frame: done")
 
