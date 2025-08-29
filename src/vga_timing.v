@@ -27,7 +27,7 @@ module vga_timing (
 `define V_FPORCH (16 * 64)
 `define V_SYNC   (16 * 64 + 3)
 `define V_BPORCH (16 * 64 + 7)
-`define V_NEXT   (16 * 64 + 29)
+`define V_NEXT   (16 * 64 + 35)
 
 always @(posedge clk) begin
     if (!rst_n) begin
