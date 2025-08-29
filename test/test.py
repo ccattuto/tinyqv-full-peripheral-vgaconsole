@@ -101,7 +101,7 @@ async def test_project(dut):
 # and 152 pixel horizontal back porch.
 # NOTICE: it assumes that the pixel clock is the same as the system clock.
 async def grab_vga(dut, hsync, vsync, R1, R0, B1, B0, G1, G0,
-                   width=1024, height=768, v_back_porch_lines=22, h_back_porch_pixels=152):
+                   width=1024, height=768, v_back_porch_lines=28, h_back_porch_pixels=152):
     vga_frame = np.zeros((height, width, 3), dtype=np.uint8)
 
     # sync to the end of the vsync pulse
