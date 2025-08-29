@@ -87,6 +87,13 @@ async def test_project(dut):
 
     # check interrupt behavior
     dut._log.info("Test interrupt behavior")
+
+    for _ in range(2):  # skip past line 768
+        while hsync.value.integer == 1:
+            await Edge(dut.uo_out)
+        while hsync.value.integer == 0:
+            await Edge(dut.uo_out)
+
     assert await tqv.is_interrupt_asserted() == True
     vga_status = await tqv.read_byte_reg(0x3F)  # read VGA register to clear interrupt
     assert vga_status & 0x01 != 0

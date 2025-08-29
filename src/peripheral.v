@@ -87,7 +87,7 @@ module tqvp_example (
         if (!rst_n) begin
             interrupt <= 0;
         end else begin
-            if ((~|y_lo) & (~|y_hi)) begin
+            if ((y_hi == 5'd16) && !(|y_lo) && x_at_reset) begin
                 interrupt <= 1;
             end else if ((&address) & (~&data_read_n)) begin  // read REG_VGA
                 interrupt <= 0;
